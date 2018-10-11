@@ -45,6 +45,9 @@ here.local ubiquitous computing software infrastructure
 ```
 
 ##### `http://here.local/api/client/<ip>`
+<pre>
+sample <b>sample</b> sample
+</pre>
 
 ```
     {
