@@ -46,14 +46,10 @@ here.local ubiquitous computing software infrastructure
 
 ##### `http://here.local/api/client/<ip>`
 <pre>
-sample <b>sample</b> sample
-</pre>
-
-```
     {
         hostname: "Bobs-macbook",
         mac: "00:00:00:00:00:00:00:00",
-        `**`ip: "10.0.0.73"`**`,
+        **ip: "10.0.0.73"**,
         vendor: "XEROX CORPORATION",
         agent: "Mozilla/5.0...",
         signal: -60,
@@ -61,7 +57,7 @@ sample <b>sample</b> sample
             
         }
     }
-```
+</pre>
   
 ##### `http://here.local/api/client/<mac>`
 
