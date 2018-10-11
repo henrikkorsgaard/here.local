@@ -31,15 +31,15 @@ here.local ubiquitous computing software infrastructure
 ##### `http://here.local/api/client`
 
 ```
-  {
-    hostname: <hostname>,
-    mac: <mac>,
-    ip: <ip>,
-    vendor: <vendor>,
-    client: <browser>,
-    signal: <signal>,
-    proximity: <location>
-  }
+    {
+        hostname: <hostname>,
+        mac: <mac>,
+        ip: <ip>,
+        vendor: <vendor>,
+        client: <browser>,
+        signal: <signal>,
+        proximity: <location>
+    }
 ```
 
 ##### `http://here.local/api/client/<ip>`
