@@ -52,10 +52,7 @@ here.local ubiquitous computing software infrastructure
         <b>ip: "10.0.0.73"</b>,
         vendor: "XEROX CORPORATION",
         agent: "Mozilla/5.0...",
-        signal: -60,
-        proximity: {
-            
-        }
+        signal: -60
     }
 </pre>
   
