@@ -32,13 +32,15 @@ here.local ubiquitous computing software infrastructure
 
 ```
     {
-        hostname: <hostname>,
-        mac: <mac>,
-        ip: <ip>,
-        vendor: <vendor>,
-        client: <browser>,
-        signal: <signal>,
-        proximity: <location>
+        hostname: "Bobs-macbook",
+        mac: "00:00:00:00:00:00:00:00",
+        ip: "10.0.0.73",
+        vendor: "XEROX CORPORATION",
+        agent: "Mozilla/5.0...",
+        signal: -60,
+        proximity: {
+            
+        }
     }
 ```
 
