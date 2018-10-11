@@ -34,7 +34,7 @@ here.local ubiquitous computing software infrastructure
     {
         hostname: "Bobs-macbook",
         mac: "00:00:00:00:00:00:00:00",
-        ip: "10.0.0.73",
+        ip: **"10.0.0.73"**,
         vendor: "XEROX CORPORATION",
         agent: "Mozilla/5.0...",
         signal: -60,
