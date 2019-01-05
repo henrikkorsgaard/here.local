@@ -2,7 +2,6 @@ package context
 
 import (
 	"crypto/rand"
-	"errors"
 
 	"crypto/rsa"
 	"log"
@@ -55,15 +54,9 @@ func (c *Context) GetPublicKey(msg *string, key *rsa.PublicKey) error {
 	return nil
 }
 
-func (c *Context) GetSalt(key *rsa.PublicKey, slt *string) (err error) {
-
-	if key.N == publicKey.N {
-		slt = &salt
-	} else {
-		err = errors.New("Invalid key")
-	}
-
-	return
+func (c *Context) GetSalt(msg *string, slt *string) error {
+	*slt = salt
+	return nil
 }
 
 //Run starts the context server
