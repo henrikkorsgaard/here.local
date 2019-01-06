@@ -27,6 +27,11 @@ func init() {
 }
 
 func UpsertRawDevice(rd proximity.RawDevice) {
+	/*
+		Because of the finite mac address space, we need to salt the address
+		before upserting into the database.
+
+	*/
 	mac := Salt + rd.Mac
 	hash, err := bcrypt.GenerateFromPassword([]byte(mac), 10)
 	if err != nil {
@@ -37,7 +42,6 @@ func UpsertRawDevice(rd proximity.RawDevice) {
 }
 
 func generateSalt(n int) string {
-
 	//see https://stackoverflow.com/a/31832326
 	letterBytes := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	b := make([]byte, n)
