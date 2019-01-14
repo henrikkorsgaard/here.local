@@ -5,6 +5,13 @@ type RawDevice struct {
 	Signal int
 }
 
+type NmapDevice struct {
+	Mac      string
+	Ip       string
+	Hostname string
+	Vendor   string
+}
+
 func RunSimulation() {
 
 }
