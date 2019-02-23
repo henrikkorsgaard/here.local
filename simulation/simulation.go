@@ -83,8 +83,9 @@ func simProximity() {
 
 			noise := rand.Intn(4) - 2
 			d.Signal += d.Direction * noise
-
+			fmt.Printv()
 			if d.Signal < -70 {
+				fmt.Println("Deleting device: ", d.Mac)
 				delete(activeDevices, d.Mac)
 			} else {
 				var result context.Reply
