@@ -1,0 +1,17 @@
+dev = true
+location = ""
+
+[basic-auth]
+  login = ""
+  password = ""
+
+[documents]
+  child = ""
+  parent = ""
+
+[network]
+  password = ""
+  ssid = ""
+
+[server]
+  context-server = ""
