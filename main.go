@@ -2,10 +2,11 @@ package main
 
 import (
 	"github.com/henrikkorsgaard/here.local/configuration"
+	"github.com/henrikkorsgaard/here.local/server"
 )
 
 func main() {
 
-	configuration.Bootstrap()
-
+	configuration.Setup()
+	server.Run()
 }

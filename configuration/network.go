@@ -2,16 +2,17 @@ package configuration
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/henrikkorsgaard/here.local/logging"
 	"github.com/henrikkorsgaard/wifi"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -22,10 +23,6 @@ var (
 
 func configureNetworkDevices() {
 	logging.Info("Configuring network.")
-	//what do we want ->
-	//eth0 always hotplug auto
-	//	This should happpen in /etc/network/interfaces config!
-	//1 physical device with 1 monitor mode and 1 ap mode
 
 	c, err := wifi.New()
 	defer c.Close()
@@ -149,17 +146,10 @@ func setupAccessPoint() {
 		//https://askubuntu.com/a/1017315
 
 	*/
-	viper.Set("ip", "10.0.10.1")
-	viper.Set("station-mac", wlanInterface.HardwareAddr.String())
-	viper.Set("mode", "AP")
+	envViper.Set("ip", "10.0.10.1")
+	envViper.Set("station-mac", wlanInterface.HardwareAddr.String())
+	envViper.Set("mode", "CONFIG")
 
-	/*
-		go utils.ExecuteSystemCommand("avahi-publish -a -R here.local 10.0.10.1") //This need to run in the background
-		_, err = zeroconf.Register("go-proxi-context-server", "_http._tcp", "local.", 1337, []string{"txtv=0", "lo=1", "la=2"}, nil)
-		go utils.ExecuteSystemCommand("avahi-publish -a -R " + location + ".local " + ip.String()) //Run in the background as it blocks
-		_, err = zeroconf.Register("go-proxi-context-server-node", "_http._tcp", "local.", 80, []string{"txtv=0", "lo=1", "la=2"}, nil)
-		isAP = true
-	*/
 	logging.Info("Done configuring device as access point")
 }
 
@@ -199,13 +189,47 @@ func setupWifiConnection() {
 		setupAccessPoint()
 	}
 
+	ip, err := detectIP(wlanInterface)
+	logging.Fatal(ip)
 	stationMac, err := detectStationMac(wlanInterface)
 	logging.Fatal(err)
 
-	viper.Set("ip", "10.0.10.1") //TODO WE NEED TO GET IP
-	viper.Set("station-mac", stationMac.String())
-	viper.Set("mode", "NETWORKED")
+	envViper.Set("ip", ip)
+	envViper.Set("station-mac", stationMac.String())
+	masterDetected, err := detectMasterMode()
+	logging(err)
+	if masterDetected {
+		envViper.Set("mode", "SLAVE")
+	} else {
+		envViper.Set("mode", "MASTER")
+	}
 
+}
+
+func detectIP(wlanInterface *wifi.Interface) (string, error) {
+	var ip string
+	wlan, err := net.InterfaceByName(wlanInterface.Name)
+	if err != nil {
+		return ip, err
+	}
+	addrs, err := wlan.Addrs()
+	if err != nil {
+		return "", err
+	}
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				ip = ipnet.IP.String()
+				break
+			}
+		}
+	}
+
+	if ip == "" {
+		return ip, fmt.Errorf("unable to detect wlan ip address")
+	}
+
+	return ip, err
 }
 
 func setInterfaceUp(ifaceName string) error {
@@ -358,3 +382,42 @@ func runCommand(command string) (stdout string, stderr string, err error) {
 
 	return string(stdoutBuffer.Bytes()), string(stderrBuffer.Bytes()), err
 }
+
+func detectMasterMode() (bool, error) {
+	resolver, err := zeroconf.NewResolver(nil)
+	if err != nil {
+		return false, err
+	}
+
+	foundService := false
+
+	entries := make(chan *zeroconf.ServiceEntry)
+
+	go func(results <-chan *zeroconf.ServiceEntry) {
+		for entry := range results {
+			if entry.Instance == "here.local.context.server" {
+				foundService = true
+				break
+			}
+		}
+	}(entries)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer cancel()
+
+	err = resolver.Browse(ctx, "_http._tcp", "local.", entries)
+	if err != nil {
+		return false, err
+	}
+
+	<-ctx.Done()
+	return foundService, nil
+}
+
+/*
+	go utils.ExecuteSystemCommand("avahi-publish -a -R here.local 10.0.10.1") //This need to run in the background
+	_, err = zeroconf.Register("go-proxi-context-server", "_http._tcp", "local.", 1337, []string{"txtv=0", "lo=1", "la=2"}, nil)
+	go utils.ExecuteSystemCommand("avahi-publish -a -R " + location + ".local " + ip.String()) //Run in the background as it blocks
+	_, err = zeroconf.Register("go-proxi-context-server-node", "_http._tcp", "local.", 80, []string{"txtv=0", "lo=1", "la=2"}, nil)
+	isAP = true
+*/

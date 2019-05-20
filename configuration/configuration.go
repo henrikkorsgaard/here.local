@@ -14,11 +14,18 @@ import (
 )
 
 var (
-	ConfigViper *viper.Viper
+	configViper *viper.Viper
+	envViper    *viper.Viper
 	devMode     bool
 )
 
-func Bootstrap() {
+const (
+	CONFIG_MODE = "CONFIG"
+	SLAVE_MODE  = "SLAVE"
+	MASTER_MODE = "MASTER"
+)
+
+func Setup() {
 	//we want to make sure here.local is run as root
 
 	usr, err := user.Current()
@@ -36,12 +43,11 @@ func Bootstrap() {
 
 func loadConfiguration() {
 	devMode = viper.GetBool("dev") // retreive value from viper
-	ConfigViper = viper.New()
+	configViper = viper.New()
+	envViper = viper.New()
 	var path string
 
 	if devMode {
-		//check if file exists
-		fmt.Println("dev file")
 		path = "./here.local.config.toml"
 	} else {
 		fmt.Println("in here!")
@@ -61,17 +67,17 @@ func loadConfiguration() {
 
 	}
 
-	ConfigViper.SetConfigFile(path)
-	err = ConfigViper.ReadInConfig() // Find and read the config file
+	configViper.SetConfigFile(path)
+	err = configViper.ReadInConfig() // Find and read the config file
 	logging.Fatal(err)
 
-	location := ConfigViper.GetString("location")
+	location := configViper.GetString("location")
 
 	if location == "" {
-		ConfigViper.Set("location", "HERE-"+randSeq(6))
-		err = ConfigViper.WriteConfig()
+		configViper.Set("location", "HERE-"+randSeq(6))
+		err = configViper.WriteConfig()
 		logging.Fatal(err)
-		err = changeHostname(ConfigViper.GetString("location"))
+		err = changeHostname(configViper.GetString("location"))
 		logging.Fatal(err)
 	}
 
@@ -79,7 +85,7 @@ func loadConfiguration() {
 	logging.Fatal(err)
 
 	if location != hostname {
-		err = changeHostname(ConfigViper.GetString("location"))
+		err = changeHostname(configViper.GetString("location"))
 		logging.Fatal(err)
 	}
 
@@ -133,4 +139,24 @@ func changeHostname(hostname string) error {
 	}
 
 	return nil
+}
+
+func GetLocation() string {
+	return configViper.GetString("location")
+}
+
+func GetBasicAuthLogin() string {
+	return configViper.GetString("basic-auth.login")
+}
+
+func GetBasicAuthPassword() string {
+	return configViper.GetString("basic-auth.password")
+}
+
+func GetIP() string {
+	return envViper.GetString("ip")
+}
+
+func GetMode() string {
+	return envViper.GetString("mode")
 }
