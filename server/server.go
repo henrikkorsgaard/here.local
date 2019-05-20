@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/subtle"
+	"fmt"
 	"net/http"
 	"os"
 	"path"
@@ -11,50 +12,53 @@ import (
 	"github.com/henrikkorsgaard/here.local/configuration"
 	"github.com/henrikkorsgaard/here.local/logging"
 	"github.com/rs/cors"
+	"github.com/spf13/viper"
 )
 
 var (
 	publicPath        string
 	templatePath      string
-	basicAuthlogin    string
+	basicAuthLogin    string
 	basicAuthPassword string
-	ipRouter          mux.Router
-	hostRouter        mux.Router
-	globalRouter      mux.Router
+	ipRouter          *mux.Router
+	hostRouter        *mux.Router
+	globalRouter      *mux.Router
 )
 
 func Run() {
+	devMode := viper.GetBool("dev") // retreive value from viper
 
-	basicAuthlogin = configuration.GetBasicAuthLogin()
-	basicAuthPassword = configuration.GetBasicAuthPassword()
+	var ip string
+	var host string
+	var mode string
+	var exPath string
 
+	if devMode {
+		basicAuthLogin = ""
+		basicAuthPassword = ""
+		ip = "127.0.0.1"
+		host = "localhost"
+		mode = "CONFIG"
+	} else {
+		basicAuthLogin = configuration.GetBasicAuthLogin()
+		basicAuthPassword = configuration.GetBasicAuthPassword()
+		ip = configuration.GetIP()
+		host = configuration.GetLocation()
+		mode = configuration.GetMode()
+
+	}
+
+	fmt.Println(ip, host, mode)
 	ex, err := os.Executable()
 	logging.Fatal(err)
-
-	exPath := filepath.Dir(ex)
+	exPath = filepath.Dir(ex)
 	publicPath = filepath.Join(exPath, "./html/public")
-
+	templatePath = filepath.Join(exPath, "./html/templates")
+	fmt.Println(templatePath)
 	r := mux.NewRouter()
 	r.PathPrefix("/public/").Handler(http.StripPrefix("/public/", http.FileServer(http.Dir(publicPath))))
 
-	ip := configuration.GetTP()
-	host := configuration.GetLocation()
-	ipRouter = r.Host(ip).Subrouter()
-	hostRouter = r.Host(host + ".local").Subrouter()
-	globalRouter = r.Host("here.local").Subrouter()
-
-	ipRouter.HandlerFunc("/favicon.ico", faviconHandler).Methods("GET")
-	hostRouter.HandlerFunc("/favicon.ico", faviconHandler).Methods("GET")
-	globalRouter.HandlerFunc("/favicon.ico", faviconHandler).Methods("GET")
-
-	mode := configuration.GetMode()
-	if mode == configuration.CONFIG_MODE {
-		setupConfig(ipRouter, hostRouter)
-	} else if mode == configuration.CONFIG_MODE {
-		setupSlave()
-	} else {
-		setupMaster()
-	}
+	setupConfigurationServer(r)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"http://here.local"},
@@ -65,40 +69,38 @@ func Run() {
 
 	err = http.ListenAndServe(":1337", handler)
 	logging.Fatal(err)
-
 }
 
-func setupConfig(ipRouter *mux.Router, hostRouter *mux.Router) {
-	if basicAuthlogin != "" {
-		ipRouter.HandlerFunc("/", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
-		hostRouter.HandlerFunc("/", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
+func setupConfigurationServer(r *mux.Router) {
+
+	if basicAuthLogin != "" {
+		r.HandleFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
 	} else {
-		ipRouter.HandlerFunc("/", configHandler).Methods("GET", "POST")
-		hostRouter.HandlerFunc("/", configHandler).Methods("GET", "POST")
+		r.HandleFunc("/config", configHandler).Methods("GET", "POST")
 	}
 }
 
-func setupSlave(ipRouter *mux.Router, hostRouter *mux.Router) {
+func setupSlave() {
 
-	if basicAuthlogin != "" {
-		ipRouter.HandlerFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
-		hostRouter.HandlerFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
+	if basicAuthLogin != "" {
+		ipRouter.HandleFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
+		hostRouter.HandleFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
 	} else {
-		ipRouter.HandlerFunc("/config", configHandler).Methods("GET", "POST")
-		hostRouter.HandlerFunc("/config", configHandler).Methods("GET", "POST")
+		ipRouter.HandleFunc("/config", configHandler).Methods("GET", "POST")
+		hostRouter.HandleFunc("/config", configHandler).Methods("GET", "POST")
 	}
 
 }
 
-func setupMaster(ipRouter *mux.Router, hostRouter *mux.Router, globalRouter *mux.Router) {
-	if basicAuthlogin != "" {
-		ipRouter.HandlerFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
-		hostRouter.HandlerFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
-		globalRouter.HandlerFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
+func setupMaster() {
+	if basicAuthLogin != "" {
+		ipRouter.HandleFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
+		hostRouter.HandleFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
+		globalRouter.HandleFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
 	} else {
-		ipRouter.HandlerFunc("/config", configHandler).Methods("GET", "POST")
-		hostRouter.HandlerFunc("/config", configHandler).Methods("GET", "POST")
-		globalRouter.HandlerFunc("/config", configHandler).Methods("GET", "POST")
+		ipRouter.HandleFunc("/config", configHandler).Methods("GET", "POST")
+		hostRouter.HandleFunc("/config", configHandler).Methods("GET", "POST")
+		globalRouter.HandleFunc("/config", configHandler).Methods("GET", "POST")
 	}
 
 	//run config server

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grandcat/zeroconf"
 	"github.com/henrikkorsgaard/here.local/logging"
 	"github.com/henrikkorsgaard/wifi"
 )
@@ -89,7 +90,7 @@ func configureNetworkDevices() {
 		logging.Fatal(fmt.Errorf("unable to detect station wifi interface"))
 	}
 
-	ssid := ConfigViper.GetString("network.ssid")
+	ssid := configViper.GetString("network.ssid")
 	if ssid == "" {
 		setupAccessPoint()
 	} else if ok := isNetworkAvailable(ssid, wlanInterface); ok {
@@ -114,7 +115,7 @@ func setupAccessPoint() {
 	logging.Fatal(err)
 
 	str = "interface=" + wlanInterface.Name + "\n"
-	str += "ssid=" + ConfigViper.GetString("location") + "\n"
+	str += "ssid=" + configViper.GetString("location") + "\n"
 	str += "driver=nl80211\n"
 	str += "hw_mode=g\n"
 	str += "channel=6\n"
@@ -159,8 +160,8 @@ func setupWifiConnection() {
 	err = stopDnsmasqService()
 	logging.Fatal(err)
 
-	password := ConfigViper.GetString("network.password")
-	ssid := ConfigViper.GetString("network.ssid")
+	password := configViper.GetString("network.password")
+	ssid := configViper.GetString("network.ssid")
 
 	if password == "" {
 		wpa := "network={\n\tssid=\"" + ssid + "\"\n\tkey_mgmt=NONE\n}"
@@ -190,14 +191,14 @@ func setupWifiConnection() {
 	}
 
 	ip, err := detectIP(wlanInterface)
-	logging.Fatal(ip)
+	logging.Fatal(err)
 	stationMac, err := detectStationMac(wlanInterface)
 	logging.Fatal(err)
 
 	envViper.Set("ip", ip)
 	envViper.Set("station-mac", stationMac.String())
 	masterDetected, err := detectMasterMode()
-	logging(err)
+	logging.Fatal(err)
 	if masterDetected {
 		envViper.Set("mode", "SLAVE")
 	} else {
@@ -368,6 +369,19 @@ func isNetworkAvailable(ssid string, iface *wifi.Interface) bool {
 
 	ok := strings.Contains(stdout, ssid+"\n")
 	return ok
+}
+
+func getAvailableNetworkSSIDS() (ssids []string) {
+	stdout, stderr, err := runCommand("sudo iw " + wlanInterface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
+	logging.Info(err.Error())
+
+	if stderr != "" {
+		logging.Info(stderr)
+	}
+
+	ssids = strings.Split(stdout, "\n")
+
+	return
 }
 
 func runCommand(command string) (stdout string, stderr string, err error) {

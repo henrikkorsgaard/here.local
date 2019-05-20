@@ -160,3 +160,7 @@ func GetIP() string {
 func GetMode() string {
 	return envViper.GetString("mode")
 }
+
+func GetNetworks() []string {
+	return getAvailableNetworkSSIDS()
+}

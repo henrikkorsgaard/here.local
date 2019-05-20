@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/henrikkorsgaard/here.local/configuration"
+	"fmt"
+
 	"github.com/henrikkorsgaard/here.local/server"
 )
 
 func main() {
-
-	configuration.Setup()
+	fmt.Println("here")
+	//configuration.Setup()
 	server.Run()
 }
