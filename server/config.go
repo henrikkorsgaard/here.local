@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"path"
@@ -10,48 +11,40 @@ import (
 )
 
 type config struct {
-	Location          string
-	SSID              string
-	Password          string
-	Document          string
-	BasicAuthLogin    string
-	BasicAuthPassword string
-	SSIDs             []string
+	Location          string   `json:"location,omitempty"`
+	SSID              string   `json:"ssid,omitempty"`
+	Password          string   `json:"password,omitempty"`
+	Document          string   `json:"document,omitempty"`
+	BasicAuthLogin    string   `json:"ba_login,omitempty"`
+	BasicAuthPassword string   `json:"ba_password,omitempty"`
+	SSIDs             []string `json:"ssids,omitempty"`
+	Reboot            bool     `json:"rebbot,omitempty"`
 }
 
 func configHandler(w http.ResponseWriter, r *http.Request) {
 
 	//create the config construct from configuration.Getters!
 
-	t := template.New("")
-	t.ParseFiles(path.Join(templatePath, "config.tmpl"))
 	ssids := []string{"SSID1", "SSID2", "SSID3", "SSID4"}
 	//generate the config from configurations
-	configs := config{"Henrik's office", "SSID3", "secret", "webstrate", "admin", "pass", ssids}
+	configs := config{"Henrik's office", "SSID3", "secret", "webstrate", "admin", "pass", ssids, false}
 
 	if r.Method == "POST" {
-		err := r.ParseForm()
+		var clientConfigs config
+		err := json.NewDecoder(r.Body).Decode(&clientConfigs)
 		logging.Fatal(err)
+		fmt.Printf("%+v", clientConfigs)
 
-		reboot := r.FormValue("reboot")
-		if reboot == "true" {
-			fmt.Println("reboot node")
-		} else {
+		//we want to return a message if a) we are good on the changes or b) if we reboot
+		//setheader to return json
+		w.WriteHeader(200)
+	} else if r.Method == "GET" {
 
-			newConfigs := config{r.FormValue("location"), r.FormValue("ssid"), r.FormValue("password"), r.FormValue("document"), r.FormValue("balogin"), r.FormValue("bapassword"), nil}
-
-			//compare everything now!
-
-			configs = newConfigs
-			configs.SSIDs = ssids
-
+		t := template.New("")
+		t.ParseFiles(path.Join(templatePath, "config.tmpl"))
+		if err := t.ExecuteTemplate(w, "config", configs); err != nil {
+			logging.Fatal(err)
 		}
-
-		fmt.Println("hep")
 	}
-
-	if err := t.ExecuteTemplate(w, "config", configs); err != nil {
-		logging.Fatal(err)
-	}
-
+	return
 }

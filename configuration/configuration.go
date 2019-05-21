@@ -7,6 +7,8 @@ import (
 	"math/rand"
 	"os"
 	"os/user"
+	"regexp"
+	"sync"
 	"time"
 
 	"github.com/henrikkorsgaard/here.local/logging"
@@ -25,20 +27,80 @@ const (
 	MASTER_MODE = "MASTER"
 )
 
-func Setup() {
-	//we want to make sure here.local is run as root
+type Configuration struct {
+}
 
-	usr, err := user.Current()
-	if err != nil {
-		log.Fatal("YOU NEED TO RUN HERE.LOCAL AS ROOT")
+var instance *Configuration
+var once sync.Once
+
+//GetConfiguration follows singleton pattern introduced here: http://marcio.io/2015/07/singleton-pattern-in-go/
+func GetConfiguration() *Configuration {
+	once.Do(func() {
+
+		usr, err := user.Current()
+		if err != nil {
+			log.Fatal("YOU NEED TO RUN HERE.LOCAL AS ROOT")
+		}
+
+		if usr.Uid != "0" && usr.Gid != "0" {
+			log.Fatal("YOU NEED TO RUN HERE.LOCAL AS ROOT")
+		}
+
+		loadConfiguration()
+		configureNetworkDevices()
+		instance = &Configuration{}
+	})
+	return instance
+}
+
+//SetUserConfigs sets the configs and potentially reboots based on the delta
+func (c *Configuration) SetUserConfigs(location string, document string, ssid string, password string, basicAuthLogin string, basicAuthPassword string) {
+	//I dont know if this will reboot?
+	reboot := false
+
+	configViper.Set("basic-auth.login", basicAuthLogin)
+	configViper.Set("basic-auth.password", basicAuthPassword)
+	configViper.Set("document.parent", document)
+
+	if configViper.GetString("location") != location {
+		//Validate please
+		reboot = true
 	}
 
-	if usr.Uid != "0" && usr.Gid != "0" {
-		log.Fatal("YOU NEED TO RUN HERE.LOCAL AS ROOT")
+	if configViper.GetString("network.ssid") != ssid {
+		configViper.Set("network.ssid", ssid)
+		reboot = true
 	}
 
-	loadConfiguration()
-	configureNetworkDevices()
+	if configViper.GetString("network.password") != ssid {
+		configViper.Set("network.password", password)
+		reboot = true
+	}
+}
+
+//GetBasicAuthLogin ...
+func (c *Configuration) GetBasicAuthLogin() string {
+	return configViper.GetString("basic-auth.login")
+}
+
+//GetBasicAuthPassword ...
+func (c *Configuration) GetBasicAuthPassword() string {
+	return configViper.GetString("basic-auth.password")
+}
+
+//GetIP ...
+func (c *Configuration) GetIP() string {
+	return envViper.GetString("ip")
+}
+
+//GetMode ...
+func (c *Configuration) GetMode() string {
+	return envViper.GetString("mode")
+}
+
+//GetSSIDs ...
+func (c *Configuration) GetSSIDs() []string {
+	return getAvailableNetworkSSIDS()
 }
 
 func loadConfiguration() {
@@ -77,15 +139,18 @@ func loadConfiguration() {
 		configViper.Set("location", "HERE-"+randSeq(6))
 		err = configViper.WriteConfig()
 		logging.Fatal(err)
-		err = changeHostname(configViper.GetString("location"))
+		err = changeHostname(location)
 		logging.Fatal(err)
 	}
 
 	hostname, err := os.Hostname()
 	logging.Fatal(err)
-
-	if location != hostname {
-		err = changeHostname(configViper.GetString("location"))
+	validLocation := generateValidHostname(location)
+	if validLocation != hostname {
+		configViper.Set("location", validLocation)
+		err = configViper.WriteConfig()
+		logging.Fatal(err)
+		err = changeHostname(validLocation)
 		logging.Fatal(err)
 	}
 
@@ -134,33 +199,29 @@ func changeHostname(hostname string) error {
 	if devMode {
 		fmt.Println("You need to restart to avoid sudo host not recognised errors")
 	} else {
-		_, _, err = runCommand("sudo reboot now")
-		//logging.Fatal(err)
+		rebootNode()
 	}
 
 	return nil
 }
 
-func GetLocation() string {
-	return configViper.GetString("location")
+//we need to ensure that the hostname is a) a valid hostname and b) a valid ssid
+//meaning: < 32 chars and only 0-9,a-b, A-Z, -
+func generateValidHostname(hostname string) string {
+	re := regexp.MustCompile(`[^a-zA-Z0-9--]`)
+	str := re.ReplaceAllString(location, "")
+	if len(str) > 32 {
+		str = str[0:32]
+	}
+	return str
 }
 
-func GetBasicAuthLogin() string {
-	return configViper.GetString("basic-auth.login")
+func writeConfig() {
+	err := configViper.WriteConfig()
+	logging.Fatal(err)
 }
 
-func GetBasicAuthPassword() string {
-	return configViper.GetString("basic-auth.password")
-}
-
-func GetIP() string {
-	return envViper.GetString("ip")
-}
-
-func GetMode() string {
-	return envViper.GetString("mode")
-}
-
-func GetNetworks() []string {
-	return getAvailableNetworkSSIDS()
+func rebootNode() {
+	_, _, err := runCommand("sudo reboot now")
+	logging.Fatal(err)
 }

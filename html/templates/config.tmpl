@@ -5,40 +5,97 @@
 </head>
 
 <body>
-    <form action="/config" method="post">
-        <h1>Node Location</h1>
-        <p>Select a descriptive name for the node based on its location. This will be the identifier showed on the
-            network as well as in navigating the place.</p>
-        <label for="location">Location:</label>
-        <input type="text" id="location" name="location" value="{{ .Location }}">
-        <h1>Network</h1>
-        <p>The node needs to be connected to a WiFi network to operate. Select an existing network and enter the
-            password (it can be empty for an open network).</p>
-        <label for="ssid">Network name (SSID):</label>
-        <select id="ssid" name="ssid"> // for loop in html template example
-            {{range $value := .SSIDs}}
-            <option value="{{ $value }}" {{if eq . $.SSID }}selected="selected"{{end}}>{{ . }}</option>
-            {{end}}
-        </select><br>
-        <label for="password">Network password:</label>
-        <input type="password" id="password" name="password" value="{{ .Password }}">
-        <h1>Node document</h1>
-        <p>This sensing node can be associated with content in the form of HTML documents. Enter a valid url to
-            associate a document. If left empty the node will create a template webstrate.</p>
-        <label for="document">Document (url):</label>
-        <input type="text" id="document" name="document" value=" {{ .Document }}">
-        <h1>Basic Authentication</h1>
-        <p>If you want to protect the node's configuration page, you can add a login and password.</p>
-        <label for="balogin">Login:</label>
-        <input type="text" id="balogin" name="balogin" value="{{ .BasicAuthLogin }}"><br>
-        <label for="bapassword">Password:</label>
-        <input type="password" id="bapassword" name="bapassword" value="{{ .BasicAuthPassword }}">
-        <button type="submit">Save configuration</button>
-    </form>
-    <form action="/config" method="post">
-        <input type="hidden" id="reboot" name="reboot" value="true">
-        <button type="submit">Reboot node</button>
-    </form>
+
+    <h1>Node Location</h1>
+    <p>Select a descriptive name for the node based on its location. This will be the identifier showed on the
+        network as well as in navigating the place.</p>
+    <label for="location">Location:</label>
+    <input type="text" id="location" name="location" value="{{ .Location }}">
+    <h1>Network</h1>
+    <p>The node needs to be connected to a WiFi network to operate. Select an existing network and enter the
+        password (it can be empty for an open network).</p>
+    <label for="ssid">Network name (SSID):</label>
+    <select id="ssid" name="ssid"> // for loop in html template example
+        {{range $value := .SSIDs}}
+        <option value="{{ $value }}" {{if eq . $.SSID }}selected="selected" {{end}}>{{ . }}</option>
+        {{end}}
+    </select><br>
+    <label for="password">Network password:</label>
+    <input type="password" id="password" name="password" value="{{ .Password }}">
+    <h1>Node document</h1>
+    <p>This sensing node can be associated with content in the form of HTML documents. Enter a valid url to
+        associate a document. If left empty the node will create a template webstrate.</p>
+    <label for="document">Document (url):</label>
+    <input type="text" id="document" name="document" value=" {{ .Document }}">
+    <h1>Basic Authentication</h1>
+    <p>If you want to protect the node's configuration page, you can add a login and password.</p>
+    <label for="ba_login">Login:</label>
+    <input type="text" id="ba_login" value="{{ .BasicAuthLogin }}"><br>
+    <label for="ba_password">Password:</label>
+    <input type="password" id="ba_password" value="{{ .BasicAuthPassword }}">
+    <button id="save">Save configuration</button>
+    <button id="reboot">Reboot node</button>
+
+    <script>
+        var saveBtn = document.querySelector("#save")
+        var rebootBtn = document.querySelector("#reboot")
+
+        saveBtn.onclick = save
+        rebootBtn.onclick = reboot
+        
+        var loc = document.querySelector("#location")
+        var ssid = document.querySelector("#ssid")
+        var password = document.querySelector("#password")
+        var doc = document.querySelector("#document")
+
+        var ba_login = document.querySelector("#ba_login")
+        var ba_password = document.querySelector("#ba_password")
+
+        function reboot() {
+            var json = {reboot:true}
+            sendRequest(json, function(result, err){
+                if (err) {
+                    console.log(err)
+                }
+                console.log(result)
+            });
+        }
+
+        function save() {
+            var json = {location: loc.value, ssid: ssid.value, password: password.value, document:doc.value, ba_login: ba_login.value, ba_password:ba_password.value}
+            sendRequest(json, function(result, err){
+                if (err) {
+                    console.log(err)
+                }
+                console.log(result)
+            })
+        }
+
+        function sendRequest(jsonData, callback) {
+            var xhr = new XMLHttpRequest();
+
+            xhr.onload = function () {
+                if (xhr.status >= 200) {
+                    callback(xhr.responseText, null)
+                } else {
+                    callback(null, "Failed with statuscode " + xhr.status)
+                }
+            };
+
+            xhr.onerror = function(err){
+                callback(null, "xhr request failed with error: " + err)
+            }
+
+            xhr.ontimeout = function(){
+                callback(null, "xhr request timed out!")
+            }
+
+            xhr.open('POST', '/config');
+            xhr.send(JSON.stringify(jsonData));
+        }
+
+    </script>
+
 </body>
 
 </html>
