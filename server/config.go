@@ -10,7 +10,7 @@ import (
 	"github.com/henrikkorsgaard/here.local/logging"
 )
 
-type config struct {
+type settings struct {
 	Location          string   `json:"location,omitempty"`
 	SSID              string   `json:"ssid,omitempty"`
 	Password          string   `json:"password,omitempty"`
@@ -21,13 +21,13 @@ type config struct {
 	Reboot            bool     `json:"rebbot,omitempty"`
 }
 
+var (
+	configs := configuration.GetConfiguration()
+)
+
 func configHandler(w http.ResponseWriter, r *http.Request) {
 
-	//create the config construct from configuration.Getters!
-
-	ssids := []string{"SSID1", "SSID2", "SSID3", "SSID4"}
-	//generate the config from configurations
-	configs := config{"Henrik's office", "SSID3", "secret", "webstrate", "admin", "pass", ssids, false}
+	nodeSettings := settings{configs.GetLocation(),configs.GetSSID(),configs.GetPassword(), configs.GetDocument(), configs.GetBasicAuthLogin(), configs.GetBasicAuthPassword(), configs.GetSSIDs(), false}
 
 	if r.Method == "POST" {
 		var clientConfigs config
@@ -42,7 +42,7 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 
 		t := template.New("")
 		t.ParseFiles(path.Join(templatePath, "config.tmpl"))
-		if err := t.ExecuteTemplate(w, "config", configs); err != nil {
+		if err := t.ExecuteTemplate(w, "config", nodeSettings); err != nil {
 			logging.Fatal(err)
 		}
 	}

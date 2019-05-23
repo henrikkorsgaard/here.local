@@ -54,16 +54,14 @@ func GetConfiguration() *Configuration {
 }
 
 //SetUserConfigs sets the configs and potentially reboots based on the delta
-func (c *Configuration) SetUserConfigs(location string, document string, ssid string, password string, basicAuthLogin string, basicAuthPassword string) {
+func (c *Configuration) SetUserConfigs(location string, ssid string, password string, basicAuthLogin string, basicAuthPassword string, document string) {
 	//I dont know if this will reboot?
 	reboot := false
 
-	configViper.Set("basic-auth.login", basicAuthLogin)
-	configViper.Set("basic-auth.password", basicAuthPassword)
-	configViper.Set("document.parent", document)
+	validLocation := generateValidHostname(location)
 
-	if configViper.GetString("location") != location {
-		//Validate please
+	if configViper.GetString("node.location") != location && configViper.GetString("location") != validLocation {
+		configViper.Set("node.location", validLocation)
 		reboot = true
 	}
 
@@ -76,6 +74,24 @@ func (c *Configuration) SetUserConfigs(location string, document string, ssid st
 		configViper.Set("network.password", password)
 		reboot = true
 	}
+
+	configViper.Set("basic-auth.login", basicAuthLogin)
+	configViper.Set("basic-auth.password", basicAuthPassword)
+	configViper.Set("node.document", document)
+
+	if reboot {
+		rebootNode()
+	}
+}
+
+//GetLocation ...
+func (c *Configuration) GetLocation() string {
+	return configViper.GetString("node.location")
+}
+
+//GetDocument ...
+func (c *Configuration) GetDocument() string {
+	return configViper.GetString("node.document")
 }
 
 //GetBasicAuthLogin ...
@@ -86,6 +102,16 @@ func (c *Configuration) GetBasicAuthLogin() string {
 //GetBasicAuthPassword ...
 func (c *Configuration) GetBasicAuthPassword() string {
 	return configViper.GetString("basic-auth.password")
+}
+
+//GetSSID ...
+func (c *Configuration) GetSSID() string {
+	return configViper.GetString("network.ssid")
+}
+
+//GetPassword ...
+func (c *Configuration) GetPassword() string {
+	return configViper.GetString("network.password")
 }
 
 //GetIP ...
@@ -136,7 +162,7 @@ func loadConfiguration() {
 	location := configViper.GetString("location")
 
 	if location == "" {
-		configViper.Set("location", "HERE-"+randSeq(6))
+		configViper.Set("node.location", "HERE-"+randSeq(6))
 		err = configViper.WriteConfig()
 		logging.Fatal(err)
 		err = changeHostname(location)
@@ -147,7 +173,7 @@ func loadConfiguration() {
 	logging.Fatal(err)
 	validLocation := generateValidHostname(location)
 	if validLocation != hostname {
-		configViper.Set("location", validLocation)
+		configViper.Set("node.location", validLocation)
 		err = configViper.WriteConfig()
 		logging.Fatal(err)
 		err = changeHostname(validLocation)

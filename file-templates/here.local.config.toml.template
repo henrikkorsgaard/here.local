@@ -1,12 +1,10 @@
-location = ""
+[node]
+  location = ""
+  document = ""
 
 [basic-auth]
   login = ""
   password = ""
-
-[documents]
-  child = ""
-  parent = ""
 
 [network]
   password = ""

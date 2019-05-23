@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	fmt.Println("here")
+	
 	//configuration.Setup()
 	server.Run()
 }
