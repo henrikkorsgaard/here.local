@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"runtime"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
@@ -22,7 +23,8 @@ func init() {
 	pflag.Parse()
 	viper.BindPFlags(pflag.CommandLine)
 	devMode := viper.GetBool("dev")
-	if devMode {
+
+	if devMode || runtime.GOOS != "linux" {
 
 		//This has implications toward logging!
 		logrus.Info("Running in developer mode.")

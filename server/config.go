@@ -30,10 +30,13 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 		err := json.NewDecoder(r.Body).Decode(&clientConfigs)
 		logging.Fatal(err)
 		fmt.Printf("%+v", clientConfigs)
-
-		//we want to return a message if a) we are good on the changes or b) if we reboot
-		//setheader to return json
-		w.WriteHeader(200)
+		//WE NEED TO DETERMINE IF THERE IS A REBOOT INCOMING AND WE NEED TO SEND MESSAGE BACK
+		rb := configs.WillNeedReboot(clientConfigs.Location, clientConfigs.SSID, clientConfigs.Password)
+		if clientConfigs.Reboot || rb {
+			fmt.Fprint(w, `{"reboot": true}`)
+		} else {
+			fmt.Fprint(w, `{"reboot": false}`)
+		}
 	} else if r.Method == "GET" {
 
 		t := template.New("")

@@ -372,14 +372,19 @@ func isNetworkAvailable(ssid string, iface *wifi.Interface) bool {
 }
 
 func getAvailableNetworkSSIDS() (ssids []string) {
-	stdout, stderr, err := runCommand("sudo iw " + wlanInterface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
-	logging.Info(err.Error())
 
-	if stderr != "" {
-		logging.Info(stderr)
+	if mode := envViper.GetString("mode"); mode != DEVELOPER_MODE {
+		stdout, stderr, err := runCommand("sudo iw " + wlanInterface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
+		logging.Info(err.Error())
+
+		if stderr != "" {
+			logging.Info(stderr)
+		}
+
+		ssids = strings.Split(stdout, "\n")
+	} else {
+		ssids = []string{"TEST_SSID_1", "TEST_SSID_2", "TEST_SSID_3", "TEST_SSID_4", "TEST_SSID_5", "TEST_SSID_6"}
 	}
-
-	ssids = strings.Split(stdout, "\n")
 
 	return
 }

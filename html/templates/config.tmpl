@@ -57,7 +57,17 @@
                 if (err) {
                     console.log(err)
                 }
-                console.log(result)
+                try {
+                    var json = JSON.parse(result)
+                    
+                    if (json.reboot){
+                        console.log("load reboot message")
+                    } else {
+                        console.log("will not reboot")
+                    }
+                } catch (e){
+                    console.log(e)
+                }
             });
         }
 
@@ -67,7 +77,16 @@
                 if (err) {
                     console.log(err)
                 }
-                console.log(result)
+                try {
+                    var json = JSON.parse(result)
+                    if (json.reboot){
+                        console.log("load reboot message")
+                    } else {
+                        console.log("will not reboot")
+                    }
+                } catch (e){
+                    console.log(e)
+                }
             })
         }
 

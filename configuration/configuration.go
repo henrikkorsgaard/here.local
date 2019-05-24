@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/user"
 	"regexp"
+	"runtime"
 	"sync"
 	"time"
 
@@ -24,12 +25,14 @@ var (
 	configViper *viper.Viper
 	envViper    *viper.Viper
 	devMode     bool
+	linux       bool
 )
 
 const (
-	CONFIG_MODE = "CONFIG"
-	SLAVE_MODE  = "SLAVE"
-	MASTER_MODE = "MASTER"
+	CONFIG_MODE    = "CONFIG"
+	SLAVE_MODE     = "SLAVE"
+	MASTER_MODE    = "MASTER"
+	DEVELOPER_MODE = "DEVELOPER"
 )
 
 type Configuration struct {
@@ -51,9 +54,11 @@ func GetConfiguration() *Configuration {
 			log.Fatal("YOU NEED TO RUN HERE.LOCAL AS ROOT")
 		}
 
-		loadConfiguration()
-		devMode := viper.GetBool("dev") // retreive value from viper
-		if !devMode {
+		devMode = viper.GetBool("dev") // retreive value from viper
+		if runtime.GOOS != "linux" {
+			loadDeveloperConfiguration()
+		} else {
+			loadConfiguration()
 			configureNetworkDevices()
 		}
 
@@ -91,6 +96,25 @@ func (c *Configuration) SetUserConfigs(location string, ssid string, password st
 	if reboot {
 		rebootNode()
 	}
+}
+
+//WillNeedReboot ...
+func (c *Configuration) WillNeedReboot(location string, ssid string, password string) bool {
+	reboot := false
+	validLocation := generateValidHostname(location)
+	if configViper.GetString("node.location") != location && configViper.GetString("location") != validLocation {
+		reboot = true
+	}
+
+	if configViper.GetString("network.ssid") != ssid {
+		reboot = true
+	}
+
+	if configViper.GetString("network.password") != ssid {
+		reboot = true
+	}
+
+	return reboot
 }
 
 //GetLocation ...
@@ -167,7 +191,7 @@ func loadConfiguration() {
 	err = configViper.ReadInConfig() // Find and read the config file
 	logging.Fatal(err)
 
-	location := configViper.GetString("location")
+	location := configViper.GetString("node.location")
 
 	if location == "" {
 		configViper.Set("node.location", "HERE-"+randSeq(6))
@@ -189,6 +213,49 @@ func loadConfiguration() {
 	}
 
 	//if the location is not set then we have the whole host issue all over again
+}
+
+func loadDeveloperConfiguration() {
+	fmt.Println("Loading Developer Configurations")
+	fmt.Println("Warning: Key network configurations are missing")
+	fmt.Println("Developer mode only allow testing http server part")
+	configViper = viper.New()
+	envViper = viper.New()
+	envViper.Set("mode", DEVELOPER_MODE)
+	path := "./here.local.config.toml"
+
+	exist, err := fileOrDirExists(path)
+	logging.Fatal(err)
+
+	if !exist { //we copy the config file if not existing
+		input, err := ioutil.ReadFile("./file-templates/here.local.config.toml.template")
+		logging.Fatal(err)
+
+		err = ioutil.WriteFile(path, input, 0666)
+		logging.Fatal(err)
+		os.Chmod(path, 0666) //need this to make sure we set the file permissions (WriteFile will not do it alone)
+
+	}
+
+	configViper.SetConfigFile(path)
+	err = configViper.ReadInConfig() // Find and read the config file
+	logging.Fatal(err)
+
+	location := configViper.GetString("node.location")
+
+	if location == "" {
+		hostname, err := os.Hostname()
+		logging.Fatal(err)
+		configViper.Set("node.location", hostname)
+		err = configViper.WriteConfig()
+		logging.Fatal(err)
+	}
+
+	configViper.Set("network.ssid", "developer")
+	configViper.Set("network.password", "secret")
+
+	envViper.Set("mode", DEVELOPER_MODE)
+	envViper.Set("ip", "127.0.0.1")
 }
 
 // exists returns whether the given file or directory exists
@@ -256,6 +323,11 @@ func writeConfig() {
 }
 
 func rebootNode() {
-	_, _, err := runCommand("sudo reboot now")
-	logging.Fatal(err)
+	if mode := envViper.GetString("mode"); mode != DEVELOPER_MODE {
+		_, _, err := runCommand("sudo reboot now")
+		logging.Fatal(err)
+	} else {
+		fmt.Println("RUNNING IN DEVELOPER MODE -- RESTART COMMAND IGNORED!")
+	}
+
 }
