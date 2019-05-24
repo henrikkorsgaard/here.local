@@ -16,6 +16,11 @@ import (
 )
 
 var (
+	/*
+		configViber reflects  configurations in the public configuration file on the node
+		envViper reflects environement configurations
+		we want to avoid mixing these, as Viper writes all the settings to the file.
+	*/
 	configViper *viper.Viper
 	envViper    *viper.Viper
 	devMode     bool
@@ -47,14 +52,18 @@ func GetConfiguration() *Configuration {
 		}
 
 		loadConfiguration()
-		configureNetworkDevices()
+		devMode := viper.GetBool("dev") // retreive value from viper
+		if !devMode {
+			configureNetworkDevices()
+		}
+
 		instance = &Configuration{}
 	})
 	return instance
 }
 
 //SetUserConfigs sets the configs and potentially reboots based on the delta
-func (c *Configuration) SetUserConfigs(location string, ssid string, password string, basicAuthLogin string, basicAuthPassword string, document string) {
+func (c *Configuration) SetUserConfigs(location string, ssid string, password string, authLogin string, authPassword string, document string) {
 	//I dont know if this will reboot?
 	reboot := false
 
@@ -75,8 +84,8 @@ func (c *Configuration) SetUserConfigs(location string, ssid string, password st
 		reboot = true
 	}
 
-	configViper.Set("basic-auth.login", basicAuthLogin)
-	configViper.Set("basic-auth.password", basicAuthPassword)
+	configViper.Set("authentication.login", authLogin)
+	configViper.Set("authentication.password", authPassword)
 	configViper.Set("node.document", document)
 
 	if reboot {
@@ -95,13 +104,13 @@ func (c *Configuration) GetDocument() string {
 }
 
 //GetBasicAuthLogin ...
-func (c *Configuration) GetBasicAuthLogin() string {
-	return configViper.GetString("basic-auth.login")
+func (c *Configuration) GetAuthenticationLogin() string {
+	return configViper.GetString("authentication.login")
 }
 
 //GetBasicAuthPassword ...
-func (c *Configuration) GetBasicAuthPassword() string {
-	return configViper.GetString("basic-auth.password")
+func (c *Configuration) GetAuthenticationPassword() string {
+	return configViper.GetString("authentication.password")
 }
 
 //GetSSID ...
@@ -138,7 +147,6 @@ func loadConfiguration() {
 	if devMode {
 		path = "./here.local.config.toml"
 	} else {
-		fmt.Println("in here!")
 		path = "/boot/here.local.config.toml"
 	}
 
@@ -235,7 +243,7 @@ func changeHostname(hostname string) error {
 //meaning: < 32 chars and only 0-9,a-b, A-Z, -
 func generateValidHostname(hostname string) string {
 	re := regexp.MustCompile(`[^a-zA-Z0-9--]`)
-	str := re.ReplaceAllString(location, "")
+	str := re.ReplaceAllString(hostname, "")
 	if len(str) > 32 {
 		str = str[0:32]
 	}

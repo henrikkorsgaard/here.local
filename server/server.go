@@ -16,35 +16,31 @@ import (
 )
 
 var (
-	publicPath        string
-	templatePath      string
-	basicAuthLogin    string
-	basicAuthPassword string
-	ipRouter          *mux.Router
-	hostRouter        *mux.Router
-	globalRouter      *mux.Router
+	publicPath   string
+	templatePath string
+	ipRouter     *mux.Router
+	hostRouter   *mux.Router
+	globalRouter *mux.Router
+	configs      *configuration.Configuration
 )
 
 func Run() {
 	devMode := viper.GetBool("dev") // retreive value from viper
-
+	configs = configuration.GetConfiguration()
 	var ip string
 	var host string
 	var mode string
 	var exPath string
 
 	if devMode {
-		basicAuthLogin = ""
-		basicAuthPassword = ""
 		ip = "127.0.0.1"
 		host = "localhost"
 		mode = "CONFIG"
 	} else {
-		basicAuthLogin = configuration.GetBasicAuthLogin()
-		basicAuthPassword = configuration.GetBasicAuthPassword()
-		ip = configuration.GetIP()
-		host = configuration.GetLocation()
-		mode = configuration.GetMode()
+
+		ip = configs.GetIP()
+		host = configs.GetLocation()
+		mode = configs.GetMode()
 
 	}
 
@@ -72,51 +68,41 @@ func Run() {
 }
 
 func setupConfigurationServer(r *mux.Router) {
-
-	if basicAuthLogin != "" {
-		r.HandleFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
-	} else {
-		r.HandleFunc("/config", configHandler).Methods("GET", "POST")
-	}
+	r.HandleFunc("/config", BasicAuth(configHandler)).Methods("GET", "POST")
 }
 
 func setupSlave() {
 
-	if basicAuthLogin != "" {
-		ipRouter.HandleFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
-		hostRouter.HandleFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
-	} else {
-		ipRouter.HandleFunc("/config", configHandler).Methods("GET", "POST")
-		hostRouter.HandleFunc("/config", configHandler).Methods("GET", "POST")
-	}
+	ipRouter.HandleFunc("/config", BasicAuth(configHandler)).Methods("GET", "POST")
+	hostRouter.HandleFunc("/config", BasicAuth(configHandler)).Methods("GET", "POST")
 
 }
 
 func setupMaster() {
-	if basicAuthLogin != "" {
-		ipRouter.HandleFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
-		hostRouter.HandleFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
-		globalRouter.HandleFunc("/config", BasicAuth(configHandler, basicAuthLogin, basicAuthPassword, "Please enter username and password")).Methods("GET", "POST")
-	} else {
-		ipRouter.HandleFunc("/config", configHandler).Methods("GET", "POST")
-		hostRouter.HandleFunc("/config", configHandler).Methods("GET", "POST")
-		globalRouter.HandleFunc("/config", configHandler).Methods("GET", "POST")
-	}
+
+	ipRouter.HandleFunc("/config", BasicAuth(configHandler)).Methods("GET", "POST")
+	hostRouter.HandleFunc("/config", BasicAuth(configHandler)).Methods("GET", "POST")
+	globalRouter.HandleFunc("/config", BasicAuth(configHandler)).Methods("GET", "POST")
 
 	//run config server
 	//run api server
 	//run context server
 }
 
-//BasicAuth does something
-func BasicAuth(handler http.HandlerFunc, username, password, realm string) http.HandlerFunc {
+//BasicAuth handles authentication to the config server
+//It will fetch the user/pass information from the configuration file on every query
+//to ensure that any updates are reflected without a server restart
+func BasicAuth(handler http.HandlerFunc) http.HandlerFunc {
+
+	username := configs.GetAuthenticationLogin()
+	password := configs.GetAuthenticationPassword()
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		user, pass, ok := r.BasicAuth()
 
 		if !ok || subtle.ConstantTimeCompare([]byte(user), []byte(username)) != 1 || subtle.ConstantTimeCompare([]byte(pass), []byte(password)) != 1 {
-			w.Header().Set("WWW-Authenticate", `Basic realm="`+realm+`"`)
+			w.Header().Set("WWW-Authenticate", `Basic realm="Please enter username and password"`)
 			w.WriteHeader(401)
 			w.Write([]byte("Unauthorised.\n"))
 			return

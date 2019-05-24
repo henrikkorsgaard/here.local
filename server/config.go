@@ -21,16 +21,12 @@ type settings struct {
 	Reboot            bool     `json:"rebbot,omitempty"`
 }
 
-var (
-	configs := configuration.GetConfiguration()
-)
-
 func configHandler(w http.ResponseWriter, r *http.Request) {
 
-	nodeSettings := settings{configs.GetLocation(),configs.GetSSID(),configs.GetPassword(), configs.GetDocument(), configs.GetBasicAuthLogin(), configs.GetBasicAuthPassword(), configs.GetSSIDs(), false}
+	nodeSettings := settings{configs.GetLocation(), configs.GetSSID(), configs.GetPassword(), configs.GetDocument(), configs.GetAuthenticationLogin(), configs.GetAuthenticationPassword(), configs.GetSSIDs(), false}
 
 	if r.Method == "POST" {
-		var clientConfigs config
+		var clientConfigs settings
 		err := json.NewDecoder(r.Body).Decode(&clientConfigs)
 		logging.Fatal(err)
 		fmt.Printf("%+v", clientConfigs)

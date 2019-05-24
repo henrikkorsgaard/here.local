@@ -1,11 +1,14 @@
+# Information helping to describe the node
 [node]
   location = ""
   document = ""
 
-[basic-auth]
+# Login and password used for the basic authentication on the configurations page
+[authentication]
   login = ""
   password = ""
 
+# Network information for the network the node is connected to
 [network]
   password = ""
   ssid = ""
