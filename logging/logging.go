@@ -25,7 +25,6 @@ func init() {
 	devMode := viper.GetBool("dev")
 
 	if devMode || runtime.GOOS != "linux" {
-
 		//This has implications toward logging!
 		logrus.Info("Running in developer mode.")
 		logger.Out = os.Stdout
@@ -34,7 +33,7 @@ func init() {
 		file, err := os.OpenFile("/boot/here.local.log", os.O_CREATE|os.O_WRONLY, 0666)
 		if err == nil {
 			logger.Out = file
-			logger.SetLevel(logrus.FatalLevel)
+			logger.SetLevel(logrus.InfoLevel)
 		} else {
 			log.Fatal("Unable to open log file /boot/here.local.log!")
 		}

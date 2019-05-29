@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"os/exec"
 	"strings"
@@ -17,78 +16,32 @@ import (
 )
 
 var (
-	monitorInterface  *wifi.Interface
-	wlanInterface     *wifi.Interface
-	physicalInterface *wifi.PHY
+	monitorInterface *net.Interface
+	wlanInterface    *wifi.Interface
+	mainPhyInterface *wifi.PHY
+//	scanInterface    *wifi.Interface
 )
 
 func configureNetworkDevices() {
 	logging.Info("Configuring network.")
 
-	c, err := wifi.New()
-	defer c.Close()
-	if err != nil {
-		fmt.Println(err)
-		log.Panic("Unable to create nl80211 comunication client.")
-	}
-	phys, err := c.PHYs()
+	mainPhyInterface, err := detectCompatibleNetworkDevice()
 	logging.Fatal(err)
 
-	for _, phy := range phys {
-		var monitor bool
-		var accessPoint bool
+	logging.Info("Found compatible network device " + mainPhyInterface.Name)
 
-		//we need to check if the interface supports access point and monitor interface types
-		// we do not check possible interface combinations as we assume:
-		// that access point will always run isolated
-		// and that we can run monitor and station simultaniusly
-		for _, supportedIfaceType := range phy.SupportedIftypes {
-			if supportedIfaceType == wifi.InterfaceTypeAP {
-				accessPoint = true
-			}
-
-			if supportedIfaceType == wifi.InterfaceTypeMonitor {
-				monitor = true
-			}
-		}
-
-		if monitor && accessPoint {
-			physicalInterface = phy
-			//break if we find a suiting interface
-			break
-		}
-	}
-
-	//If we can detect a good physical network interface, there is no point in continuing.
-	if physicalInterface == nil {
-		logging.Fatal(fmt.Errorf("unable to detect a physical network interface supporting both monitor and access point mode"))
-	}
-
-	ifaces, err := c.Interfaces()
+	monitorInterface, err = detectMonitorInterface(mainPhyInterface)
 	logging.Fatal(err)
 
-	for _, iface := range ifaces {
-		if iface.PHY == physicalInterface.Index && iface.Name == "here-monitor" {
-			monitorInterface = iface
-		}
+	logging.Info("Setting up here-monitor interface")
 
-		if iface.PHY == physicalInterface.Index && iface.Name != "here-monitor" {
-			wlanInterface = iface
-
-		}
-	}
-
-	if monitorInterface == nil {
-		err := createMonitorInterface(physicalInterface)
-		logging.Fatal(err)
-	}
-
-	err = setInterfaceUp("here-monitor")
+	wlanInterface, err = detectWLANInterface(mainPhyInterface)
 	logging.Fatal(err)
 
-	if wlanInterface == nil {
-		logging.Fatal(fmt.Errorf("unable to detect station wifi interface"))
-	}
+//	scanInterface, err = detectScanInterface(wlanInterface)
+//	logging.Fatal(err)
+
+	logging.Info("Setting up wlan interface")
 
 	ssid := configViper.GetString("network.ssid")
 	if ssid == "" {
@@ -100,9 +53,174 @@ func configureNetworkDevices() {
 	}
 }
 
+func detectCompatibleNetworkDevice() (phy *wifi.PHY, err error) {
+	c, err := wifi.New()
+	defer c.Close()
+	if err != nil {
+		return
+	}
+
+	phys, err := c.PHYs()
+	if err != nil {
+		return
+	}
+
+	for _, phyIface := range phys {
+		var monitor bool
+		var accessPoint bool
+
+		//we need to check if the interface supports access point and monitor interface types
+		// we do not check possible interface combinations as we assume:
+		// that access point will always run isolated
+		// and that we can run monitor and station simultaniusly
+		for _, supportedIfaceType := range phyIface.SupportedIftypes {
+			if supportedIfaceType == wifi.InterfaceTypeAP {
+				accessPoint = true
+			}
+
+			if supportedIfaceType == wifi.InterfaceTypeMonitor {
+				monitor = true
+			}
+		}
+
+		if monitor && accessPoint {
+			phy = phyIface
+		}
+	}
+
+	if phy == nil {
+		err = fmt.Errorf("Unable to detect compantible physical wifi device")
+	}
+
+	return
+}
+
+func detectScanInterface(wlan *wifi.Interface) (scanIface *wifi.Interface, err error) {
+	c, err := wifi.New()
+	defer c.Close()
+	if err != nil {
+		return
+	}
+
+	var scanNetIface *net.Interface
+
+	ifaces, err := c.Interfaces()
+	if err != nil {
+		return
+	}
+
+	for _, iface := range ifaces {
+		if iface.Name != wlan.Name && iface.Name != "here-monitor" {
+			scanNetIface, err = net.InterfaceByName(iface.Name)
+			if err != nil {
+				return
+			}
+
+			scanIface = iface
+
+			break
+		}
+	}
+
+	if scanNetIface.Flags&net.FlagUp == 0 {
+		_, _, err = runCommand("sudo ifconfig "+ scanNetIface.Name + " up") 
+		if err != nil || scanNetIface.Flags&net.FlagUp == 0 {
+			scanIface = nil
+			return
+		}
+
+	}
+
+	return
+}
+
+func detectMonitorInterface(phy *wifi.PHY) (monIface *net.Interface, err error) {
+
+	monIface, _ = net.InterfaceByName("here-monitor")
+
+	if monIface == nil {
+		_, _, err = runCommand("sudo iw phy " + phy.Name + " interface add here-monitor type monitor")
+		if err != nil {
+			return
+		}
+
+		monIface, err = net.InterfaceByName("here-monitor")
+		if err != nil || monIface == nil {
+			return
+		}
+	}
+
+	if monIface.Flags&net.FlagUp == 0 {
+
+		_, _, err = runCommand("sudo ifconfig here-monitor up")
+		if err != nil {
+			return
+		}
+
+		if monIface.Flags&net.FlagUp == 0 {
+			return
+		}
+	}
+
+	return
+}
+
+func detectWLANInterface(phy *wifi.PHY) (wlanIface *wifi.Interface, err error) {
+	c, err := wifi.New()
+	defer c.Close()
+	if err != nil {
+		return
+	}
+
+	ifaces, err := c.Interfaces()
+	if err != nil {
+		return
+	}
+
+	var wlanNetIface *net.Interface
+
+	for _, iface := range ifaces {
+		if iface.PHY == phy.Index && iface.Name != "here-monitor" {
+			wlanIface = iface
+			wlanNetIface, err = net.InterfaceByName(iface.Name)
+			if err != nil {
+				return
+			}
+
+			break
+		}
+	}
+
+	if wlanNetIface == nil {
+		_, _, err = runCommand("sudo iw phy " + phy.Name + " interface add here-wlan type managed")
+		if err != nil {
+			return
+		}
+
+		wlanNetIface, err = net.InterfaceByName("here-wlan")
+		if err != nil || wlanNetIface == nil {
+			return
+		}
+	}
+
+	if wlanNetIface.Flags&net.FlagUp == 0 {
+		_, _, err = runCommand("sudo ifconfig " + wlanNetIface.Name + " up")
+		if err != nil {
+			return
+		}
+
+		if wlanNetIface.Flags&net.FlagUp == 0 {
+			return
+		}
+	}
+
+	return
+}
+
 func setupAccessPoint() {
 
 	logging.Info("Setting up Access Point")
+	fmt.Println("Setting up Access Point")
 
 	str := "interface=" + wlanInterface.Name + "\n"
 	str += "domain-needed\n"
@@ -115,7 +233,7 @@ func setupAccessPoint() {
 	logging.Fatal(err)
 
 	str = "interface=" + wlanInterface.Name + "\n"
-	str += "ssid=" + configViper.GetString("location") + "\n"
+	str += "ssid=" + configViper.GetString("node.location") + "\n"
 	str += "driver=nl80211\n"
 	str += "hw_mode=g\n"
 	str += "channel=6\n"
@@ -138,28 +256,23 @@ func setupAccessPoint() {
 
 	err = restartNetworkService()
 	logging.Fatal(err)
-	err = restartDnsmasqService()
+	err = startAccessPointServices()
 	logging.Fatal(err)
-	err = restartHostapdService()
-	logging.Fatal(err)
+
 	/*
 		//systemctl unmask name.service
 		//https://askubuntu.com/a/1017315
 
 	*/
 	envViper.Set("ip", "10.0.10.1")
-	envViper.Set("station-mac", wlanInterface.HardwareAddr.String())
+	envViper.Set("station", wlanInterface.HardwareAddr.String())
 	envViper.Set("mode", "CONFIG")
-
-	logging.Info("Done configuring device as access point")
+	fmt.Println("this far")
+	logging.Info("Access Point configured with ssid: " + configViper.GetString("node.location") + ", ip: 10.0.10.1, in CONFIG mode!")
 }
 
 func setupWifiConnection() {
-	err := stopHostapdService()
-	logging.Fatal(err)
-	err = stopDnsmasqService()
-	logging.Fatal(err)
-
+	logging.Info("Setting up WLAN conncection")
 	password := configViper.GetString("network.password")
 	ssid := configViper.GetString("network.ssid")
 
@@ -171,32 +284,38 @@ func setupWifiConnection() {
 		_, _, err := runCommand("sudo wpa_passphrase " + ssid + " " + password + " > /etc/wpa_supplicant/wpa_supplicant.conf")
 		logging.Fatal(err)
 	} else {
-		logging.Fatal(fmt.Errorf("Unable to connect to network named " + ssid + ". Password to short for WPA (HERE.LOCAL do not support WEB as is)"))
+		logging.Info("Unable to connect to network named " + ssid + ". Password to short for WPA (HERE.LOCAL do not support WEB as is)")
 		setupAccessPoint()
+		return
 	}
 
 	str := "allow-hotplug eth0\nauto eth0\niface eth0 inet dhcp\n\n"
 	str += "allow-hotplug " + wlanInterface.Name + "\nauto " + wlanInterface.Name + "\niface " + wlanInterface.Name + " inet dhcp\n"
 	str += "\twpa_conf /etc/wpa_supplicant/wpa_supplicant.conf\n\n"
-	err = ioutil.WriteFile("/etc/network/interfaces", []byte(str), 0766)
+	err := ioutil.WriteFile("/etc/network/interfaces", []byte(str), 0766)
 	logging.Fatal(err)
 	err = restartNetworkService()
 	logging.Fatal(err)
 
-	// we should be able to detect conneciton and the mac address from the detectStationMAC as an improvement
-	connected, err := detectSSIDLink(wlanInterface)
-	logging.Fatal(err)
-	if !connected {
+	station, err := detectLinkAddress(wlanInterface)
+
+	if err != nil || station == nil {
+		logging.Info("Unable to associate WLAN with link " + ssid + "! Aborting WLAN configuration.")
 		setupAccessPoint()
+		return
 	}
 
 	ip, err := detectIP(wlanInterface)
 	logging.Fatal(err)
-	stationMac, err := detectStationMac(wlanInterface)
-	logging.Fatal(err)
+
+	if ip == "" {
+		logging.Info("Unable to accuire IP! Aborting WLAN configuration.")
+		setupAccessPoint()
+		return
+	}
 
 	envViper.Set("ip", ip)
-	envViper.Set("station-mac", stationMac.String())
+	envViper.Set("station", station.String())
 	masterDetected, err := detectMasterMode()
 	logging.Fatal(err)
 	if masterDetected {
@@ -205,11 +324,11 @@ func setupWifiConnection() {
 		envViper.Set("mode", "MASTER")
 	}
 
+	logging.Info("WLAN configured and connected to " + ssid + " with ip " + ip + " in " + envViper.GetString("mode") + " mode.")
 }
 
-func detectIP(wlanInterface *wifi.Interface) (string, error) {
-	var ip string
-	wlan, err := net.InterfaceByName(wlanInterface.Name)
+func detectIP(wlanIface *wifi.Interface) (ip string, err error) {
+	wlan, err := net.InterfaceByName(wlanIface.Name)
 	if err != nil {
 		return ip, err
 	}
@@ -226,36 +345,7 @@ func detectIP(wlanInterface *wifi.Interface) (string, error) {
 		}
 	}
 
-	if ip == "" {
-		return ip, fmt.Errorf("unable to detect wlan ip address")
-	}
-
 	return ip, err
-}
-
-func setInterfaceUp(ifaceName string) error {
-	_, stderr, err := runCommand("sudo ifconfig " + ifaceName + " up")
-	if err != nil {
-		return err
-	}
-
-	if stderr != "" {
-		return fmt.Errorf(stderr)
-	}
-	return nil
-}
-
-func createMonitorInterface(phy *wifi.PHY) error {
-	_, stderr, err := runCommand("sudo iw phy " + phy.Name + "interface add here-monitor type monitor")
-	if err != nil {
-		return err
-	}
-
-	if stderr != "" {
-		return fmt.Errorf(stderr)
-	}
-
-	return nil
 }
 
 func restartNetworkService() error {
@@ -271,8 +361,9 @@ func restartNetworkService() error {
 	return nil
 }
 
-func restartDnsmasqService() error {
-	_, stderr, err := runCommand("sudo systemctl restart dnsmasq.service")
+func startAccessPointServices() error {
+
+	_, stderr, err := runCommand("sudo systemctl start dnsmasq.service")
 	if err != nil {
 		return err
 	}
@@ -281,10 +372,20 @@ func restartDnsmasqService() error {
 		return fmt.Errorf(stderr)
 	}
 
-	return nil
-}
+	_, stderr, err = runCommand("sudo systemctl start hostapd.service")
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
 
-func stopDnsmasqService() error {
+	if stderr != "" {
+		return fmt.Errorf(stderr)
+	}
+
+	return nil
+
+}
+func stopAccessPointServices() error {
 	_, stderr, err := runCommand("sudo systemctl stop dnsmasq.service")
 	if err != nil {
 		return err
@@ -294,11 +395,7 @@ func stopDnsmasqService() error {
 		return fmt.Errorf(stderr)
 	}
 
-	return nil
-}
-
-func restartHostapdService() error {
-	_, stderr, err := runCommand("sudo systemctl restart hostapd.service")
+	_, stderr, err = runCommand("sudo systemctl stop hostapd.service")
 	if err != nil {
 		return err
 	}
@@ -310,80 +407,72 @@ func restartHostapdService() error {
 	return nil
 }
 
-func stopHostapdService() error {
-	_, stderr, err := runCommand("sudo systemctl stop hostapd.service")
-	if err != nil {
-		return err
-	}
-
-	if stderr != "" {
-		return fmt.Errorf(stderr)
-	}
-
-	return nil
-}
-
-func detectSSIDLink(wlan *wifi.Interface) (bool, error) {
+func detectLinkAddress(wlan *wifi.Interface) (addr *net.HardwareAddr, err error) {
 	c, err := wifi.New()
 	defer c.Close()
 	if err != nil {
-		return false, err
+		return
 	}
 
 	bss, err := c.BSS(wlan)
 	if err != nil {
-		return false, err
+		return
 	}
-	return bss.Status == wifi.BSSStatusAssociated, nil
-}
-
-func detectStationMac(wlan *wifi.Interface) (net.HardwareAddr, error) {
-	c, err := wifi.New()
-	defer c.Close()
-	if err != nil {
-		return nil, err
+	if bss.Status == wifi.BSSStatusAssociated {
+		addr = &bss.BSSID
 	}
-
-	stations, err := c.StationInfo(wlanInterface)
-
-	if err != nil {
-		return nil, err
-	}
-	var addr net.HardwareAddr
-	for _, station := range stations {
-		addr = station.HardwareAddr
-	}
-
-	return addr, nil
-
+	return
 }
 
 func isNetworkAvailable(ssid string, iface *wifi.Interface) bool {
-
-	stdout, stderr, err := runCommand("sudo iw " + iface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
-	logging.Fatal(err)
-
-	if stderr != "" {
-		fmt.Println(stderr)
-	}
-
+	stdout, _, _ := runCommand("sudo iw " + iface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
 	ok := strings.Contains(stdout, ssid+"\n")
 	return ok
 }
 
-func getAvailableNetworkSSIDS() (ssids []string) {
+func getSSIDList() (ssids []string) {
+	mode := envViper.GetString("mode")
 
-	if mode := envViper.GetString("mode"); mode != DEVELOPER_MODE {
-		stdout, stderr, err := runCommand("sudo iw " + wlanInterface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
-		logging.Info(err.Error())
+	var stdout, stderr string
+	var err error
 
-		if stderr != "" {
-			logging.Info(stderr)
-		}
+	fmt.Println("we got this far, right?")
 
-		ssids = strings.Split(stdout, "\n")
+	if mode == "CONFIG" {
+		//if scanInterface != nil {
+		//	stdout, stderr, err = runCommand("sudo iw " + scanInterface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
+		//} else {
+			stopAccessPointServices()
+			stdout, stderr, err = runCommand("sudo iw " + wlanInterface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
+			startAccessPointServices()
+		//}
+
 	} else {
-		ssids = []string{"TEST_SSID_1", "TEST_SSID_2", "TEST_SSID_3", "TEST_SSID_4", "TEST_SSID_5", "TEST_SSID_6"}
+		stdout, stderr, err = runCommand("sudo iw " + wlanInterface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
+	}
+
+
+	logging.Fatal(err)
+	if stderr != "" {
+		logging.Info(stderr)
+	}
+
+	raw := strings.Split(stdout, "\n")
+	for _, ssidRaw := range raw {
+		if ssidRaw != "" {
+			exist := false
+
+			for _, ssid := range ssids {
+				if ssidRaw == ssid {
+					exist = true
+					break
+				}
+			}
+
+			if !exist {
+				ssids = append(ssids, ssidRaw)
+			}
+		}
 	}
 
 	return
