@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"time"
 
-	"../../proximity/proximity"
+	"github.com/henrikkorsgaard/here.local/proximity"
 	"golang.org/x/crypto/bcrypt"
 )
 

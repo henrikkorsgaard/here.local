@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/rpc"
 
-	"../../proximity/proximity"
+	"github.com/henrikkorsgaard/here.local/proximity"
 )
 
 var (

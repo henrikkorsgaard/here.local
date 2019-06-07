@@ -11,7 +11,3 @@ type NmapDevice struct {
 	Hostname string
 	Vendor   string
 }
-
-func RunSimulation() {
-
-}

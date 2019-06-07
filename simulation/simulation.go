@@ -1,4 +1,4 @@
-package main
+package simulation
 
 import (
 	"fmt"
@@ -7,8 +7,8 @@ import (
 	"net/rpc"
 	"time"
 
-	"../context/context"
-	"../proximity/proximity"
+	"github.com/henrikkorsgaard/here.local/proximity"
+	"github.com/henrikkorsgaard/here.local/server/context"
 )
 
 type simDevice struct {
@@ -35,7 +35,7 @@ var (
 	client         *rpc.Client
 )
 
-func RunProximitySimulation() {
+func Run() {
 	//genrate devices
 	activeDevices = make(map[string]simDevice)
 	rawDevicePool = make(map[string]proximity.RawDevice)
@@ -51,7 +51,8 @@ func RunProximitySimulation() {
 	var err error
 	client, err = rpc.DialHTTP("tcp", "localhost:1339")
 	if err != nil {
-
+		// we need to wait and try again
+		fmt.Printf("%+v\n", err)
 		log.Fatal("Error setting up RPC connection: ", err)
 	}
 
@@ -83,7 +84,6 @@ func simProximity() {
 
 			noise := rand.Intn(4) - 2
 			d.Signal += d.Direction * noise
-			fmt.Printv()
 			if d.Signal < -70 {
 				fmt.Println("Deleting device: ", d.Mac)
 				delete(activeDevices, d.Mac)
