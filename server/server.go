@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/subtle"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,18 +14,21 @@ import (
 )
 
 var (
-	publicPath   string
-	templatePath string
-	ipRouter     *mux.Router
-	hostRouter   *mux.Router
-	globalRouter *mux.Router
+	publicPath    string
+	templatePath  string
+	ipRouter      *mux.Router
+	hostRouter    *mux.Router
+	globalRouter  *mux.Router
+	contextServer *ContextServer
 )
 
 func Run() {
 
+	runContextServer(configuration.ContextServerAddress)
+	fmt.Println("whaa")
 	var exPath string
-
 	ex, err := os.Executable()
+
 	logging.Fatal(err)
 	exPath = filepath.Dir(ex)
 	publicPath = filepath.Join(exPath, "./html/public")

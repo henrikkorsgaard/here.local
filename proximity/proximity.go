@@ -1,25 +1,20 @@
 package proximity
 
 import (
+	"fmt"
 	"log"
 	"net/rpc"
 	"os/user"
 	"runtime"
+	"time"
 
+	"github.com/henrikkorsgaard/here.local/configuration"
 	"github.com/henrikkorsgaard/here.local/logging"
 )
 
-type RawDevice struct {
-	Mac    string
-	Signal int
-}
-
-type NmapDevice struct {
-	Mac      string
-	Ip       string
-	Hostname string
-	Vendor   string
-}
+var (
+	rpcClient *rpc.Client
+)
 
 func Run() {
 
@@ -29,7 +24,8 @@ func Run() {
 	}
 
 	if runtime.GOOS != "linux" {
-		simulateProximityData()
+		//go setupRPCClient()
+		//simulate()
 	} else {
 		if usr.Uid != "0" && usr.Gid != "0" {
 
@@ -40,18 +36,17 @@ func Run() {
 }
 
 func setupRPCClient() {
+	for {
+		c, err := rpc.DialHTTP("tcp", configuration.ContextServerAddress)
 
-	//we need to do this in a go routine
-
-	var err error
-	client, err = rpc.DialHTTP("tcp", "localhost:1339")
-	if err != nil {
-		log.Fatal("Error setting up RPC connection: ", err)
+		if err != nil || c == nil {
+			fmt.Println(err)
+			time.Sleep(10 * time.Second)
+		} else {
+			rpcClient = c
+			break
+		}
 	}
-}
-
-func simulateProximityData() {
-
 }
 
 func scan() {

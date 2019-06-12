@@ -1,5 +1,6 @@
-package context
+package server
 
+/*
 import (
 	"fmt"
 	"log"
@@ -21,7 +22,7 @@ type Device struct {
 	To ensure that stuff would persist over reloads:
 		- write salt to config file somewhere.
 		- make a setting that will reset salt?
-*/
+
 
 var (
 	Salt    string
@@ -38,7 +39,7 @@ func UpsertRawDevice(rd proximity.RawDevice) {
 	/*
 		Because of the finite mac address space, we need to salt the address
 		before upserting into the database.
-	*/
+
 
 	mac := Salt + rd.Mac
 	hash, err := bcrypt.GenerateFromPassword([]byte(mac), 10)
@@ -64,4 +65,4 @@ func generateSalt(n int) string {
 
 func upkeep() {
 	//run through the devices and do something :)
-}
+}*/

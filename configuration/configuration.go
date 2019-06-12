@@ -15,12 +15,13 @@ import (
 )
 
 var (
-/*
-	configViber reflects  configurations in the public configuration file on the node
-	envViper reflects environement configurations
-	we want to avoid mixing these, as Viper writes all the settings to the file.
-*/
+	/*
+		configViber reflects  configurations in the public configuration file on the node
+		envViper reflects environement configurations
+		we want to avoid mixing these, as Viper writes all the settings to the file.
+	*/
 
+	ContextServerAddress string
 )
 
 const (
@@ -83,7 +84,7 @@ func Setup() {
 }
 
 func devConfig() {
-	//
+	ContextServerAddress = "localhost:1339"
 }
 
 func config() {
