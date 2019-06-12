@@ -1,14 +1,12 @@
 package logging
 
 import (
-	"flag"
 	"log"
 	"os"
+	"os/user"
 	"runtime"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 )
 
 var logger *logrus.Logger
@@ -17,25 +15,28 @@ func init() {
 
 	logger = logrus.New()
 
-	flag.Bool("dev", false, "Run in developer mode")
+	usr, err := user.Current()
+	if err != nil {
+		logger.Fatal(err)
+	}
 
-	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-	pflag.Parse()
-	viper.BindPFlags(pflag.CommandLine)
-	devMode := viper.GetBool("dev")
-
-	if devMode || runtime.GOOS != "linux" {
-		//This has implications toward logging!
+	if runtime.GOOS != "linux" {
 		logrus.Info("Running in developer mode.")
 		logger.Out = os.Stdout
 		logger.SetLevel(logrus.DebugLevel)
+
 	} else {
-		file, err := os.OpenFile("/boot/here.local.log", os.O_CREATE|os.O_WRONLY, 0666)
-		if err == nil {
-			logger.Out = file
-			logger.SetLevel(logrus.InfoLevel)
+		if usr.Uid != "0" && usr.Gid != "0" {
+			file, err := os.OpenFile("/boot/here.local.log", os.O_CREATE|os.O_WRONLY, 0666)
+			if err == nil {
+				logger.Out = file
+				logger.SetLevel(logrus.InfoLevel)
+			} else {
+				log.Fatal("Unable to open log file /boot/here.local.log!")
+			}
+
 		} else {
-			log.Fatal("Unable to open log file /boot/here.local.log!")
+			log.Fatal("YOU NEED TO RUN HERE.LOCAL AS ROOT")
 		}
 	}
 }

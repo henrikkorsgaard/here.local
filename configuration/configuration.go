@@ -12,19 +12,15 @@ import (
 	"time"
 
 	"github.com/henrikkorsgaard/here.local/logging"
-	"github.com/spf13/viper"
 )
 
 var (
-	/*
-		configViber reflects  configurations in the public configuration file on the node
-		envViper reflects environement configurations
-		we want to avoid mixing these, as Viper writes all the settings to the file.
-	*/
-	configViper *viper.Viper
-	envViper    *viper.Viper
-	devMode     bool
-	linux       bool
+/*
+	configViber reflects  configurations in the public configuration file on the node
+	envViper reflects environement configurations
+	we want to avoid mixing these, as Viper writes all the settings to the file.
+*/
+
 )
 
 const (
@@ -46,6 +42,7 @@ type UserSettings struct {
 	Reboot            bool     `json:"rebbot,omitempty"`
 }
 
+/*
 func init() {
 	usr, err := user.Current()
 	if err != nil {
@@ -65,196 +62,186 @@ func init() {
 	}
 }
 
+*/
+
+func Setup() {
+
+	usr, err := user.Current()
+	if err != nil {
+		logging.Fatal(err)
+	}
+
+	if runtime.GOOS != "linux" {
+		devConfig()
+	} else {
+		if usr.Uid != "0" && usr.Gid != "0" {
+			fmt.Println("Running in deployment mode!")
+		} else {
+			log.Fatal("YOU NEED TO RUN HERE.LOCAL AS ROOT")
+		}
+	}
+}
+
+func devConfig() {
+	//
+}
+
+func config() {
+
+}
+
 //SetUserConfigs sets the configs and potentially reboots based on the delta
 func UpdateUserSettings(settings UserSettings) (reboot bool) {
+	/*
+		reboot = settings.Reboot
 
-	reboot = settings.Reboot
+		validLocation := generateValidHostname(settings.Location)
+		if settings.Location != "" && configViper.GetString("node.location") != validLocation {
+			configViper.Set("node.location", validLocation)
+			reboot = true
+		}
 
-	validLocation := generateValidHostname(settings.Location)
-	if settings.Location != "" && configViper.GetString("node.location") != validLocation {
-		configViper.Set("node.location", validLocation)
-		reboot = true
-	}
+		if settings.SSID != "" && configViper.GetString("network.ssid") != settings.SSID {
+			configViper.Set("network.ssid", settings.SSID)
+			reboot = true
+		}
 
-	if settings.SSID != "" && configViper.GetString("network.ssid") != settings.SSID {
-		configViper.Set("network.ssid", settings.SSID)
-		reboot = true
-	}
+		if configViper.GetString("network.password") != settings.Password {
+			configViper.Set("network.password", settings.Password)
+			reboot = true
+		}
 
-	if configViper.GetString("network.password") != settings.Password {
-		configViper.Set("network.password", settings.Password)
-		reboot = true
-	}
+		configViper.Set("authentication.login", settings.BasicAuthLogin)
+		configViper.Set("authentication.password", settings.BasicAuthPassword)
+		configViper.Set("node.document", settings.Document)
 
-	configViper.Set("authentication.login", settings.BasicAuthLogin)
-	configViper.Set("authentication.password", settings.BasicAuthPassword)
-	configViper.Set("node.document", settings.Document)
-
-	err := configViper.WriteConfig()
-	logging.Fatal(err)
-
-	if reboot || settings.Reboot {
-		//If we are rebooting then we might as well update the hostname
-		err = changeHostname(validLocation, false)
+		err := configViper.WriteConfig()
 		logging.Fatal(err)
-		//This will delay the reboot by 2 seconds
-		//giving the server time to reply to the client
-		go delayedReboot()
-	}
+
+		if reboot || settings.Reboot {
+			//If we are rebooting then we might as well update the hostname
+			err = changeHostname(validLocation, false)
+			logging.Fatal(err)
+			//This will delay the reboot by 2 seconds
+			//giving the server time to reply to the client
+			go delayedReboot()
+		}
+
+		return
+	*/
 
 	return
-
 }
 
 //GetUserSettings will return the current settings to the configuration server
 func GetUserSettings() (settings UserSettings) {
-	settings.Location = configViper.GetString("node.location")
-	settings.SSID = configViper.GetString("network.ssid")
-	settings.Password = configViper.GetString("network.password")
-	settings.Document = configViper.GetString("node.document")
-	settings.BasicAuthLogin = configViper.GetString("authentication.login")
-	settings.BasicAuthPassword = configViper.GetString("authentication.password")
-	settings.SSIDs = getSSIDList()
-	settings.Reboot = false
-
+	/*
+		settings.Location = configViper.GetString("node.location")
+		settings.SSID = configViper.GetString("network.ssid")
+		settings.Password = configViper.GetString("network.password")
+		settings.Document = configViper.GetString("node.document")
+		settings.BasicAuthLogin = configViper.GetString("authentication.login")
+		settings.BasicAuthPassword = configViper.GetString("authentication.password")
+		settings.SSIDs = getSSIDList()
+		settings.Reboot = false
+	*/
 	return
 }
 
 //GetLocation ...
 func GetLocation() string {
-	return configViper.GetString("node.location")
+	return ""
 }
 
 //GetDocument ...
 func GetDocument() string {
-	return configViper.GetString("node.document")
+	return ""
 }
 
 //GetBasicAuthLogin ...
 func GetAuthenticationLogin() string {
-	return configViper.GetString("authentication.login")
+	return ""
 }
 
 //GetBasicAuthPassword ...
 func GetAuthenticationPassword() string {
-	return configViper.GetString("authentication.password")
+	return ""
 }
 
 //GetSSID ...
 func GetSSID() string {
-	return configViper.GetString("network.ssid")
+	return ""
 }
 
 //GetPassword ...
 func GetPassword() string {
-	return configViper.GetString("network.password")
+	return ""
 }
 
 //GetIP ...
 func GetIP() string {
-	return envViper.GetString("ip")
+	return ""
 }
 
 //GetMode ...
 func GetMode() string {
-	return envViper.GetString("mode")
+	return ""
 }
 
 func loadConfiguration() {
-	logging.Info("Loading configurations")
-	devMode = viper.GetBool("dev")
-	configViper = viper.New()
-	envViper = viper.New()
-	var path string
+	/*
+		logging.Info("Loading configurations")
+		devMode = viper.GetBool("dev")
+		configViper = viper.New()
+		envViper = viper.New()
+		var path string
 
-	if devMode {
-		path = "./here.local.config.toml"
-	} else {
-		path = "/boot/here.local.config.toml"
-	}
+		if devMode {
+			path = "./here.local.config.toml"
+		} else {
+			path = "/boot/here.local.config.toml"
+		}
 
-	exist, err := fileOrDirExists(path)
-	logging.Fatal(err)
-
-	if !exist { //we copy the config file if not existing
-		input, err := ioutil.ReadFile("./file-templates/here.local.config.toml.template")
+		exist, err := fileOrDirExists(path)
 		logging.Fatal(err)
 
-		err = ioutil.WriteFile(path, input, 0666)
-		logging.Fatal(err)
-		os.Chmod(path, 0666) //need this to make sure we set the file permissions (WriteFile will not do it alone)
+		if !exist { //we copy the config file if not existing
+			input, err := ioutil.ReadFile("./file-templates/here.local.config.toml.template")
+			logging.Fatal(err)
 
-	}
+			err = ioutil.WriteFile(path, input, 0666)
+			logging.Fatal(err)
+			os.Chmod(path, 0666) //need this to make sure we set the file permissions (WriteFile will not do it alone)
 
-	configViper.SetConfigFile(path)
-	err = configViper.ReadInConfig() // Find and read the config file
-	logging.Fatal(err)
+		}
 
-	location := configViper.GetString("node.location")
-
-	if location == "" {
-		logging.Info("Changing hostname and rebooting")
-		location = "HERE-" + randSeq(6)
-		configViper.Set("node.location", location)
-		err = configViper.WriteConfig()
-		logging.Fatal(err)
-		err = changeHostname(location, true)
-		logging.Fatal(err)
-	}
-
-	hostname, err := os.Hostname()
-	logging.Fatal(err)
-	validLocation := generateValidHostname(location)
-	if validLocation != hostname {
-		configViper.Set("node.location", validLocation)
-		err = configViper.WriteConfig()
-		logging.Fatal(err)
-		err = changeHostname(validLocation, true)
-		logging.Fatal(err)
-	}
-}
-
-func loadDeveloperConfiguration() {
-	fmt.Println("Loading Developer Configurations")
-	fmt.Println("Warning: Key network configurations are missing")
-	fmt.Println("Developer mode only allow testing http server part")
-	configViper = viper.New()
-	envViper = viper.New()
-	envViper.Set("mode", DEVELOPER_MODE)
-	path := "./here.local.config.toml"
-
-	exist, err := fileOrDirExists(path)
-	logging.Fatal(err)
-
-	if !exist { //we copy the config file if not existing
-		input, err := ioutil.ReadFile("./file-templates/here.local.config.toml.template")
+		configViper.SetConfigFile(path)
+		err = configViper.ReadInConfig() // Find and read the config file
 		logging.Fatal(err)
 
-		err = ioutil.WriteFile(path, input, 0666)
-		logging.Fatal(err)
-		os.Chmod(path, 0666) //need this to make sure we set the file permissions (WriteFile will not do it alone)
+		location := configViper.GetString("node.location")
 
-	}
+		if location == "" {
+			logging.Info("Changing hostname and rebooting")
+			location = "HERE-" + randSeq(6)
+			configViper.Set("node.location", location)
+			err = configViper.WriteConfig()
+			logging.Fatal(err)
+			err = changeHostname(location, true)
+			logging.Fatal(err)
+		}
 
-	configViper.SetConfigFile(path)
-	err = configViper.ReadInConfig() // Find and read the config file
-	logging.Fatal(err)
-
-	location := configViper.GetString("node.location")
-
-	if location == "" {
 		hostname, err := os.Hostname()
 		logging.Fatal(err)
-		configViper.Set("node.location", hostname)
-		err = configViper.WriteConfig()
-		logging.Fatal(err)
-	}
-
-	configViper.Set("network.ssid", "developer")
-	configViper.Set("network.password", "secret")
-
-	envViper.Set("mode", DEVELOPER_MODE) //we dont need this right now
-	envViper.Set("ip", "127.0.0.1")
+		validLocation := generateValidHostname(location)
+		if validLocation != hostname {
+			configViper.Set("node.location", validLocation)
+			err = configViper.WriteConfig()
+			logging.Fatal(err)
+			err = changeHostname(validLocation, true)
+			logging.Fatal(err)
+		}
+	*/
 }
 
 // exists returns whether the given file or directory exists
@@ -322,8 +309,9 @@ func generateValidHostname(hostname string) string {
 }
 
 func writeConfig() {
-	err := configViper.WriteConfig()
-	logging.Fatal(err)
+	/*
+		err := configViper.WriteConfig()
+		logging.Fatal(err)*/
 }
 
 func delayedReboot() {

@@ -2,16 +2,9 @@ package configuration
 
 import (
 	"bytes"
-	"context"
-	"fmt"
-	"io/ioutil"
 	"net"
 	"os/exec"
-	"strings"
-	"time"
 
-	"github.com/grandcat/zeroconf"
-	"github.com/henrikkorsgaard/here.local/logging"
 	"github.com/henrikkorsgaard/wifi"
 )
 
@@ -19,9 +12,11 @@ var (
 	monitorInterface *net.Interface
 	wlanInterface    *wifi.Interface
 	mainPhyInterface *wifi.PHY
+
 //	scanInterface    *wifi.Interface
 )
 
+/*
 func configureNetworkDevices() {
 	logging.Info("Configuring network.")
 
@@ -123,7 +118,7 @@ func detectScanInterface(wlan *wifi.Interface) (scanIface *wifi.Interface, err e
 	}
 
 	if scanNetIface.Flags&net.FlagUp == 0 {
-		_, _, err = runCommand("sudo ifconfig "+ scanNetIface.Name + " up") 
+		_, _, err = runCommand("sudo ifconfig "+ scanNetIface.Name + " up")
 		if err != nil || scanNetIface.Flags&net.FlagUp == 0 {
 			scanIface = nil
 			return
@@ -263,7 +258,7 @@ func setupAccessPoint() {
 		//systemctl unmask name.service
 		//https://askubuntu.com/a/1017315
 
-	*/
+
 	envViper.Set("ip", "10.0.10.1")
 	envViper.Set("station", wlanInterface.HardwareAddr.String())
 	envViper.Set("mode", "CONFIG")
@@ -529,3 +524,16 @@ func detectMasterMode() (bool, error) {
 	_, err = zeroconf.Register("go-proxi-context-server-node", "_http._tcp", "local.", 80, []string{"txtv=0", "lo=1", "la=2"}, nil)
 	isAP = true
 */
+
+func runCommand(command string) (stdout string, stderr string, err error) {
+	cmd := exec.Command("/bin/sh", "-c", command)
+	var stdoutBuffer, stderrBuffer bytes.Buffer
+	cmd.Stdout = &stdoutBuffer
+	cmd.Stderr = &stderrBuffer
+	err = cmd.Run()
+	if err != nil {
+		return "", "", err
+	}
+
+	return string(stdoutBuffer.Bytes()), string(stderrBuffer.Bytes()), err
+}

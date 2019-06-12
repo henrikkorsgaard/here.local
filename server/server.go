@@ -8,7 +8,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/henrikkorsgaard/here.local/configuration"
-
 	"github.com/henrikkorsgaard/here.local/logging"
 	"github.com/rs/cors"
 )
@@ -45,6 +44,7 @@ func Run() {
 	logging.Info("Setting up server on port 1337")
 	err = http.ListenAndServe(":1337", handler)
 	logging.Fatal(err)
+
 }
 
 func setupConfigurationServer(r *mux.Router) {
