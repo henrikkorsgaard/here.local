@@ -15,41 +15,6 @@ var (
 	key   = "../crt/here.local.server.key"
 )
 
-//https://golang.org/pkg/net/rpc/
-/*
-//Context is the context server struct used for rpc communication. This could be the server
-type ContextServer struct {
-	srv *grpc.Server
-}
-/
-//https://bbengfort.github.io/programmer/2017/03/03/secure-grpc.html
-//https://github.com/bbengfort/sping/blob/master/server.go
-func (cs *ContextServer) Serve(addr string) error {
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("could not list on %s: %s", addr, err)
-	}
-
-	// Create the TLS credentials
-	creds, err := credentials.NewServerTLSFromFile(crt, key)
-	if err != nil {
-		return fmt.Errorf("could not load TLS keys: %s", err)
-	}
-
-	// Create the gRPC server with the credentials
-	srv := grpc.NewServer(grpc.Creds(creds))
-
-	// Serve and Listen
-	if err := srv.Serve(lis); err != nil {
-		return fmt.Errorf("grpc serve error: %s", err)
-	}
-
-	return nil
-}
-*/
-
-//https://gist.github.com/fntlnz/cf14feb5a46b2eda428e000157447309
-//https://gist.github.com/artyom/6897140
 type Reply struct {
 	Message string
 	Peers   []string
@@ -58,20 +23,24 @@ type Reply struct {
 type ContextServer struct {
 }
 
+// Possible solution https://gist.github.com/ncw/9253562
 func runContextServer(addr string) {
 
-	cert, err := tls.LoadX509KeyPair("crt/server.crt", "crt/server.key")
+	cert, err := tls.LoadX509KeyPair("crts/localhost.crt", "crts/localhost.key")
 	if err != nil {
 		log.Fatalf("server: loadkeys: %s", err)
 	}
 
-	if len(cert.Certificate) != 2 {
-		log.Fatal("server.crt should have 2 concatenated certificates: server + CA")
+	certCA, err := tls.LoadX509KeyPair("crts/here.local.crt", "crts/here.local.key")
+	if err != nil {
+		log.Fatalf("server: loadCA: %s", err)
 	}
-	ca, err := x509.ParseCertificate(cert.Certificate[1])
+
+	ca, err := x509.ParseCertificate(certCA.Certificate[0])
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	certPool := x509.NewCertPool()
 	certPool.AddCert(ca)
 	config := tls.Config{
@@ -79,6 +48,9 @@ func runContextServer(addr string) {
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		ClientCAs:    certPool,
 	}
+
+	server := new(ContextServer)
+	rpc.Register(server)
 
 	config.Rand = rand.Reader
 	service := addr
@@ -94,17 +66,15 @@ func runContextServer(addr string) {
 			break
 		}
 		log.Printf("server: accepted from %s", conn.RemoteAddr())
+
 		go handleClient(conn)
 	}
-	/*
-		server := new(ContextServer)
-		rpc.Register(server)
-		rpc.HandleHTTP()
-		l, e := net.Listen("tcp", addr)
-		if e != nil {
-			log.Fatal("listen error:", e)
-		}
-		http.Serve(l, nil)*/
+}
+
+func (c *ContextServer) Echo(msg string, reply *Reply) error {
+	reply.Message = msg
+	reply.Peers = peers
+	return nil
 }
 
 func (c *ContextServer) Echo(msg string, reply *Reply) error {
