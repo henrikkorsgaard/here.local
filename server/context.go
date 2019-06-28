@@ -15,6 +15,8 @@ var (
 	key   = "../crt/here.local.server.key"
 )
 
+//We need a way to generate certificates no?
+
 type Reply struct {
 	Message string
 	Peers   []string
