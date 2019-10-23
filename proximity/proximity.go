@@ -1,54 +1,42 @@
 package proximity
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net/rpc"
-	"os/user"
-	"runtime"
-	"time"
 
-	"github.com/henrikkorsgaard/here.local/configuration"
-	"github.com/henrikkorsgaard/here.local/logging"
+	"github.com/henrikkorsgaard/here.local/initialise/configs"
 )
 
 var (
 	rpcClient *rpc.Client
+	configTLS tls.Config
 )
 
 func Run() {
 
-	usr, err := user.Current()
+	var err error
+	configTLS, err = configs.GetTLSClientConfig()
 	if err != nil {
-		logging.Fatal(err)
+		log.Fatalf("configurationGetTLSClientConfig failed: %s", err)
 	}
 
-	if runtime.GOOS != "linux" {
-		//go setupRPCClient()
-		//simulate()
+	mode := configs.MODE
+	if mode == configs.DEVELOPER_MODE {
+		simulate()
 	} else {
-		if usr.Uid != "0" && usr.Gid != "0" {
 
-		} else {
-			log.Fatal("YOU NEED TO RUN HERE.LOCAL AS ROOT")
-		}
 	}
 }
 
-func setupRPCClient() {
-	for {
-		c, err := rpc.DialHTTP("tcp", configuration.ContextServerAddress)
-
-		if err != nil || c == nil {
-			fmt.Println(err)
-			time.Sleep(10 * time.Second)
-		} else {
-			rpcClient = c
-			break
-		}
+func connectRPC() {
+	conn, err := tls.Dial("tcp", configs.CONTEXT_SERVER_ADDR, &configTLS)
+	if err != nil {
+		fmt.Println("Unable to establish RCP connection")
+		fmt.Println("Trying again in a second")
+		return
 	}
-}
-
-func scan() {
-
+	//defer conn.Close()
+	rpcClient = rpc.NewClient(conn)
 }

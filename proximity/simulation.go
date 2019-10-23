@@ -5,7 +5,10 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/henrikkorsgaard/here.local/initialise/configs"
+
 	"github.com/henrikkorsgaard/here.local/device"
+	"github.com/henrikkorsgaard/here.local/server/context"
 )
 
 //we use these constants to give some weights to the movement algorithm
@@ -16,7 +19,7 @@ const (
 )
 
 type simDevice struct {
-	device.Device
+	device.RawDevice
 	Direction int
 }
 
@@ -25,21 +28,21 @@ var (
 	ips            = []int{2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71}
 	hostnames      = []string{"Bob-smartphone", "Alice-smartphone", "Eve-smartphone", "Bob-ipad", "Alice-ipad", "Eve-ipad", "Bob-laptop", "Alice-laptop", "Eve-laptop", "SmartTV"}
 	vendors        = []string{"Apple", "Samsung", "Sony", "Cisco", "ASUSTek", "Apple", "Samsung", "Sony", "Cisco", "ASUSTek"}
-	rawDevicePool  map[string]device.Device
-	nmapDevicePool map[string]device.Device
+	rawDevicePool  map[string]device.RawDevice
+	nmapDevicePool map[string]device.RawDevice
 	activeDevices  map[string]simDevice
 )
 
 func simulate() {
-	//genrate devices
+	//generate devices
 	activeDevices = make(map[string]simDevice)
-	rawDevicePool = make(map[string]device.Device)
-	nmapDevicePool = make(map[string]device.Device)
+	rawDevicePool = make(map[string]device.RawDevice)
+	nmapDevicePool = make(map[string]device.RawDevice)
 
 	for i := 0; i < 10; i++ {
-		rd := device.Device{MAC: macs[i], Signal: 0}
+		rd := device.RawDevice{MAC: macs[i], Signal: 0}
 		rawDevicePool[macs[i]] = rd
-		nd := device.Device{MAC: macs[i], IP: string(ips[i]), Hostname: hostnames[i], Vendor: vendors[i]}
+		nd := device.RawDevice{MAC: macs[i], IP: string(ips[i]), Hostname: hostnames[i], Vendor: vendors[i], LocationMAC: configs.NODE_MAC_ADDR}
 		nmapDevicePool[macs[i]] = nd
 	}
 
@@ -52,7 +55,7 @@ func simulate() {
 		if rnd < len(macs) {
 			mac := macs[rnd]
 			if _, ok := activeDevices[mac]; !ok {
-				activeDevices[mac] = simDevice{Device: device.Device{MAC: mac, Signal: -70, IP: ""}, Direction: COMING}
+				activeDevices[mac] = simDevice{RawDevice: device.RawDevice{MAC: mac, Signal: -70, IP: "", LocationMAC: configs.NODE_MAC_ADDR}, Direction: COMING}
 			}
 		}
 
@@ -71,14 +74,11 @@ func simulate() {
 				delete(activeDevices, d.MAC)
 			} else {
 				if rpcClient != nil {
-					/*
-						var result server.Reply
-						err := rpcClient.Call("ContextServer.SendProximityData", d.Device, &result)
-						if err != nil {
-							fmt.Println(err)
-						}
-						fmt.Println(result)
-					*/
+
+					var result context.Reply
+					rpcClient.Call("ContextServer.SendProximityData", d.RawDevice, &result)
+				} else {
+					connectRPC()
 				}
 			}
 		}

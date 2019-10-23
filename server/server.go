@@ -1,53 +1,46 @@
 package server
 
 import (
-	"crypto/subtle"
-	"fmt"
-	"net/http"
-	"os"
-	"path/filepath"
-
 	"github.com/gorilla/mux"
-	"github.com/henrikkorsgaard/here.local/configuration"
-	"github.com/henrikkorsgaard/here.local/logging"
-	"github.com/rs/cors"
 )
 
 var (
-	publicPath    string
-	templatePath  string
-	ipRouter      *mux.Router
-	hostRouter    *mux.Router
-	globalRouter  *mux.Router
-	contextServer *ContextServer
+	publicPath   string
+	templatePath string
+	ipRouter     *mux.Router
+	hostRouter   *mux.Router
+	globalRouter *mux.Router
 )
 
+/*
 func Run() {
 
-	runContextServer(configuration.ContextServerAddress)
-	fmt.Println("whaa")
-	var exPath string
-	ex, err := os.Executable()
+	//runContextServer(models.ContextServerAddress)
 
-	logging.Fatal(err)
-	exPath = filepath.Dir(ex)
-	publicPath = filepath.Join(exPath, "./html/public")
-	templatePath = filepath.Join(exPath, "./html/templates")
+		fmt.Println("whaa")
+		var exPath string
+		ex, err := os.Executable()
 
-	r := mux.NewRouter()
-	r.PathPrefix("/public/").Handler(http.StripPrefix("/public/", http.FileServer(http.Dir(publicPath))))
+		logging.Fatal(err)
+		exPath = filepath.Dir(ex)
+		publicPath = filepath.Join(exPath, "./html/public")
+		templatePath = filepath.Join(exPath, "./html/templates")
 
-	setupConfigurationServer(r)
+		r := mux.NewRouter()
+		r.PathPrefix("/public/").Handler(http.StripPrefix("/public/", http.FileServer(http.Dir(publicPath))))
 
-	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://here.local"},
-		AllowCredentials: true,
-	})
+		setupConfigurationServer(r)
 
-	handler := c.Handler(r)
-	logging.Info("Setting up server on port 1337")
-	err = http.ListenAndServe(":1337", handler)
-	logging.Fatal(err)
+		c := cors.New(cors.Options{
+			AllowedOrigins:   []string{"http://here.local"},
+			AllowCredentials: true,
+		})
+
+		handler := c.Handler(r)
+		logging.Info("Setting up server on port 1337")
+		err = http.ListenAndServe(":1337", handler)
+		logging.Fatal(err)
+
 
 }
 
@@ -56,10 +49,10 @@ func setupConfigurationServer(r *mux.Router) {
 }
 
 func setupSlave() {
-	/*
+
 		ipRouter.HandleFunc("/config", BasicAuth(configHandler)).Methods("GET", "POST")
 		hostRouter.HandleFunc("/config", BasicAuth(configHandler)).Methods("GET", "POST")
-	*/
+
 }
 
 func setupMaster() {
@@ -67,7 +60,7 @@ func setupMaster() {
 		ipRouter.HandleFunc("/config", BasicAuth(configHandler)).Methods("GET", "POST")
 		hostRouter.HandleFunc("/config", BasicAuth(configHandler)).Methods("GET", "POST")
 		globalRouter.HandleFunc("/config", BasicAuth(configHandler)).Methods("GET", "POST")
-	*/
+
 	//run config server
 	//run api server
 	//run context server
@@ -97,7 +90,7 @@ func BasicAuth(handler http.HandlerFunc) http.HandlerFunc {
 	}
 
 }
-
+*/
 /*
 func faviconHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, path.Join(publicPath, "./images/favicon.ico"))
