@@ -14,6 +14,9 @@ var (
 	configTLS tls.Config
 )
 
+//NOTE: we want to do some "bulk" sends of data, so to avoid near syncronous transmits that lead to increased db writes on the context server.
+//NOTE: we could do some normalisation here with a kalman filter?
+
 func Run() {
 
 	var err error
