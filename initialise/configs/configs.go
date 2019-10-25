@@ -4,6 +4,8 @@ var (
 	MODE                string
 	CONTEXT_SERVER_ADDR string
 	NODE_MAC_ADDR       string
+	NODE_IP_ADDR        string
+	NODE_NAME           string
 )
 
 const (

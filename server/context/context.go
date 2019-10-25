@@ -6,20 +6,16 @@ import (
 	"fmt"
 	"log"
 	"net/rpc"
+	"time"
 
 	"github.com/henrikkorsgaard/here.local/device"
 	"github.com/henrikkorsgaard/here.local/initialise/configs"
 )
 
-/*
 var (
-	peers   = []string{"1"}
-	crt     = "../crt/here.local.server.crt"
-	key     = "../crt/here.local.server.key"
-	Salt    string
-	src     rand.Source
-	devices map[string]Device
-)*/
+	deviceCache   = cache.New(cache.NoExpiration, cache.NoExpiration)
+	locationCache = cache.New(10*time.Minute, 30*time.Minute) // prolly should only rarely expire!
+)
 
 type Reply struct {
 	Message string
@@ -30,17 +26,16 @@ type ContextServer struct {
 }
 
 // Possible solution https://gist.github.com/ncw/9253562
-func Run() {
+func Run(addr string, tls.Config) {
 	fmt.Println("Running context server")
+
+	locationCache.onEvicted()
 
 	server := new(ContextServer)
 	rpc.Register(server)
-	config, err := configs.GetTLSHostConfig()
-	if err != nil {
-		log.Fatalf("configuration.GetTLSHostConfig failed: %s", err)
-	}
+	
 	config.Rand = rand.Reader
-	service := configs.CONTEXT_SERVER_ADDR
+	service := addr
 	listener, err := tls.Listen("tcp", service, &config)
 	if err != nil {
 		log.Fatalf("server: listen: %s", err)
@@ -58,13 +53,21 @@ func Run() {
 	}
 }
 
-func (c *ContextServer) SendProximityData(rd device.RawDevice, r *Reply) error {
-	device.Upsert(rd)
+func (c *ContextServer) SendProximityData(d interface{}, r *Reply) error {
+	fmt.Println(d)
 	return nil
 }
 
-/*
-//Hello returns "World"
+func (c *ContextServer) ConnectLocation(l interface{}, r *Reply) error {
+	fmt.Println(l)
+	return nil
+}
+
+func locationEvicted(mac string, l interface{}) {
+	location := l(*device.Location)
+	fmt.Printf("Location evicted %+v\n", location)
+}
+
 
 
 

@@ -1,20 +1,31 @@
 package device
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"time"
 
+	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
 )
 
+func init() {
+	initSqliteDB()
+
+}
+
+var (
+	db            *sql.DB
+)
+
 type RawDevice struct {
-	MAC        string
-	IP         string
-	Signal     int
-	Hostname   string
-	Vendor     string
-	LocationID string
+	MAC         string
+	IP          string
+	Signal      int
+	Hostname    string
+	Vendor      string
+	LocationMAC string
 }
 
 //this is insert once - query on API calls
@@ -24,6 +35,8 @@ type Device struct {
 	Vendor   string
 	LastSeen time.Time
 	Public   bool
+	Signal   int
+	Locations *Locations
 }
 
 //this is insert once - query on API calls
@@ -32,14 +45,7 @@ type Location struct {
 	IP       string
 	Name     string
 	LastSeen time.Time
-}
-
-//this is the heavy write persist //don't know how stuff scales, but resolution should be handled by the node.
-type Proximity struct {
-	DeviceID   string //unique relation
-	LocationID string //unique relation
-	Signal     int
-	Signals    []int //historical signales for additional analysis
+	Devices  []Device
 }
 
 //this is what is returned from the api
@@ -62,29 +68,21 @@ type UserLocation struct {
 	Devices []UserDevice `json:"locations,omitempty"`
 }
 
-/*
+func (d *Device) Upsert() (exists bool) {
+	return false
+}
 
+func (p *Proximity) Upsert() (exists bool) {
+	return false
+}
 
-MAC        string `json:"mac"`
-	IP         string `json:"ip"`
-	Name       string `json:"name"`
-	DeviceType string `json:"type,omitempty"`
-	Zone       string `json:"zone,omitempty"`
-	Wired      bool   `json:"wired,omitempty"`
+func (l *Location) Upsert() (exists bool) {
+	return false
+}
 
-	//Locations is never used internally - only for sending via external api
-	Locations []Location `json:"locations,omitempty"`
-	Signal    *int       `json:"signal,omitempty"`
-	Signals   []int      `json:"raw_signals,omitempty"`
-	Proximity *Location  `json:"proximity,omitempty"`
+//we actually only want to use the mysql database to record raw data for training and analysis.
 
-	locations map[string]*locationData
-	kalman    kalmango.KalmanFilter
-
-
-*/
-
-func Upsert(rd RawDevice) {
+func UpsertRawDevice(rd RawDevice) {
 
 	mac := Salt + rd.MAC
 	hash, err := bcrypt.GenerateFromPassword([]byte(mac), 10)
@@ -93,11 +91,12 @@ func Upsert(rd RawDevice) {
 		log.Fatalln("Error: ", err)
 	}
 
-	//we need to update the device in the device database
-	//we need to update the proximity in the proximity database
+	reading := Reading{locationmac: rd.LocationMAC, devicehash: string(hash), vendor: rd.Vendor, signal: rd.Signal, timestamp: time.Now()}
+	reading.Insert()
 
-	device := Device{hash: string(hash), Signal: rd.Signal}
-	fmt.Println(device)
-	fmt.Println("hep")
+	device := Device{ID: string(hash), Vendor: rd.Vendor, LastSeen: time.Now(), Signal: }
+	fmt.Printf("%+v\n", device)
 	//we ne
 }
+
+

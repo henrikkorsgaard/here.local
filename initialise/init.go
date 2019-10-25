@@ -27,8 +27,6 @@ func Init() {
 			log.Fatal("YOU NEED TO RUN HERE.LOCAL AS ROOT")
 		}
 	}
-
-	initDB()
 }
 
 func initDevMode() {
@@ -36,6 +34,8 @@ func initDevMode() {
 	configs.MODE = configs.DEVELOPER_MODE
 	configs.CONTEXT_SERVER_ADDR = "localhost:1339"
 	configs.NODE_MAC_ADDR = "00:00:00:00:00:00"
+	configs.NODE_IP_ADDR = "127.0.0.1"
+	configs.NODE_NAME = "test-device"
 }
 
 /*
