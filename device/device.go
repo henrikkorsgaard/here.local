@@ -1,22 +1,9 @@
 package device
 
 import (
-	"database/sql"
-	"fmt"
-	"log"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"golang.org/x/crypto/bcrypt"
-)
-
-func init() {
-	initSqliteDB()
-
-}
-
-var (
-	db            *sql.DB
 )
 
 type RawDevice struct {
@@ -30,13 +17,13 @@ type RawDevice struct {
 
 //this is insert once - query on API calls
 type Device struct {
-	ID       string
-	Name     string
-	Vendor   string
-	LastSeen time.Time
-	Public   bool
-	Signal   int
-	Locations *Locations
+	ID        string
+	Name      string
+	Vendor    string
+	LastSeen  time.Time
+	Public    bool
+	Signal    int
+	Locations []Location
 }
 
 //this is insert once - query on API calls
@@ -72,16 +59,12 @@ func (d *Device) Upsert() (exists bool) {
 	return false
 }
 
-func (p *Proximity) Upsert() (exists bool) {
-	return false
-}
-
 func (l *Location) Upsert() (exists bool) {
 	return false
 }
 
 //we actually only want to use the mysql database to record raw data for training and analysis.
-
+/*
 func UpsertRawDevice(rd RawDevice) {
 
 	mac := Salt + rd.MAC
@@ -94,9 +77,7 @@ func UpsertRawDevice(rd RawDevice) {
 	reading := Reading{locationmac: rd.LocationMAC, devicehash: string(hash), vendor: rd.Vendor, signal: rd.Signal, timestamp: time.Now()}
 	reading.Insert()
 
-	device := Device{ID: string(hash), Vendor: rd.Vendor, LastSeen: time.Now(), Signal: }
+	device := Device{ID: string(hash), Vendor: rd.Vendor, LastSeen: time.Now(), Signal: rd.Signal}
 	fmt.Printf("%+v\n", device)
 	//we ne
-}
-
-
+}*/
