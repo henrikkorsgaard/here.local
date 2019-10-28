@@ -62,7 +62,6 @@ func simulate() {
 			noise := rand.Intn(4) - 2
 			d.Signal += d.Direction * noise
 			if d.Signal < -70 {
-				fmt.Println("Deleting device: ", d.MAC)
 				delete(activeDevices, d.MAC)
 			} else {
 				if rpcClient != nil {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/henrikkorsgaard/here.local/configuration"
+	"github.com/henrikkorsgaard/here.local/models"
 	"github.com/henrikkorsgaard/here.local/server/contextserver"
 	"github.com/henrikkorsgaard/kalmango"
 	"github.com/patrickmn/go-cache"
@@ -19,12 +20,6 @@ var (
 	deviceCache = cache.New(10*time.Second, 30*time.Second)
 )
 
-type Location struct {
-	MAC  string
-	IP   string
-	Name string
-}
-
 type Device struct {
 	MAC        string
 	Signal     int
@@ -32,24 +27,6 @@ type Device struct {
 
 	kalman kalmango.KalmanFilter
 }
-
-type Reading struct {
-	MAC       string
-	Signal    int
-	Timestamp time.Time
-}
-
-type DeviceEvent struct {
-	Event       string
-	DeviceMAC   string
-	LocationMAC string
-	Timestamp   time.Time
-}
-
-const (
-	DEVICE_JOINED = "device joined"
-	DEVICE_LEFT   = "device left"
-)
 
 //NOTE: we want to do some "bulk" sends of data, so to avoid near syncronous transmits that lead to increased db writes on the context server.
 //NOTE: we could do some normalisation here with a kalman filter?
@@ -84,7 +61,8 @@ func connectRPC() {
 
 	//defer conn.Close()
 	rpcClient = rpc.NewClient(conn)
-	l := Location{MAC: configuration.NODE_MAC_ADDR, IP: configuration.NODE_IP_ADDR, Name: configuration.NODE_NAME}
+
+	l := models.Location{MAC: configuration.NODE_MAC_ADDR, IP: configuration.NODE_IP_ADDR, Name: configuration.NODE_NAME}
 	var result contextserver.Reply
 	rpcClient.Call("ContextServer.ConnectLocation", l, &result)
 	fmt.Println(result)
@@ -92,24 +70,25 @@ func connectRPC() {
 }
 
 func sendDevice(MAC string, Signal int) {
-	fmt.Printf("Getting device %s\n", MAC)
 	var device Device
 	if obj, ok := deviceCache.Get(MAC); ok {
 		device = obj.(Device)
 		ksig := device.kalman.Filter(float64(Signal), 0)
 		device.Signal = int(ksig)
 	} else {
-		var result contextserver.Reply
 		device = Device{MAC: MAC, Signal: Signal, kalman: kalmango.NewKalmanFilter(0.5, 8, 1, 0, 1), Discovered: time.Now()}
-		rpcClient.Call("ContextServer.DeviceEvent", DeviceEvent{Event: DEVICE_JOINED, DeviceMAC: MAC, LocationMAC: configuration.NODE_MAC_ADDR, Timestamp: time.Now()}, &result)
+		var result contextserver.Reply
+		rpcClient.Call("ContextServer.DeviceEvent", models.DeviceEvent{Event: models.DEVICE_JOINED, DeviceMAC: MAC, LocationMAC: configuration.NODE_MAC_ADDR, Timestamp: time.Now()}, &result)
 	}
+
 	var result contextserver.Reply
+	rpcClient.Call("ContextServer.DeviceReading", models.Reading{MAC, configuration.NODE_MAC_ADDR, Signal, time.Now()}, &result)
 	deviceCache.Set(MAC, device, cache.DefaultExpiration)
-	rpcClient.Call("ContextServer.DeviceReading", Reading{MAC, Signal, time.Now()}, &result)
 }
 
 func deviceEvicted(MAC string, i interface{}) {
-	fmt.Println("calling evicted")
-
-	//send the event please
+	device := i.(Device)
+	fmt.Printf("Evicting device: %+v", device)
+	var result contextserver.Reply
+	rpcClient.Call("ContextServer.DeviceEvent", models.DeviceEvent{Event: models.DEVICE_LEFT, DeviceMAC: MAC, LocationMAC: configuration.NODE_MAC_ADDR, Timestamp: time.Now()}, &result)
 }

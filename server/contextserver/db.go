@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var db *sql.DB
@@ -33,7 +35,7 @@ func initSqliteDB() {
 }
 
 func insertReading(locationmac string, devicehash string, signal int, timestamp time.Time) {
-	stmt, err := db.Prepare("INSERT INTO readings(locationmac, devicehash, signal, timestamp) values(?,?,?,?,?)")
+	stmt, err := db.Prepare("INSERT INTO readings(locationmac, devicehash, signal, timestamp) values(?,?,?,?)")
 	if err != nil {
 		fmt.Println(err)
 	}

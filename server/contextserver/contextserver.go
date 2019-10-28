@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/henrikkorsgaard/here.local/configuration"
+	"github.com/henrikkorsgaard/here.local/models"
 
 	"github.com/patrickmn/go-cache"
 	"golang.org/x/crypto/bcrypt"
@@ -48,8 +49,10 @@ type Device struct {
 // Possible solution https://gist.github.com/ncw/9253562
 func Run() {
 	fmt.Println("Running context server")
-
+	initSqliteDB()
 	Salt = randSeq(8)
+
+	locationCache.OnEvicted(locationEvicted)
 
 	server := new(ContextServer)
 	rpc.Register(server)
@@ -78,55 +81,106 @@ func Run() {
 	}
 }
 
-func (c *ContextServer) DeviceReading(obj interface{}, r *Reply) error {
-	fmt.Println("got a reading!")
-	rd := obj.(*RawDevice)
+func (c *ContextServer) DeviceReading(rd models.Reading, r *Reply) error {
 
-	//what happens if it fails
+	mac := Salt + rd.DeviceMAC
 
-	mac := Salt + rd.MAC
+	//we only do that on insert
 	hash, err := bcrypt.GenerateFromPassword([]byte(mac), 10)
 	if err != nil {
 		fmt.Println("should log, but here is error")
 		fmt.Println(err)
 	}
 
-	//we need to find out if the device exists
+	var location models.Location
+	var device models.Device
 
-	insertReading(rd.LocationMAC, string(hash), rd.Signal, rd.Timestamp)
+	if l, ok := locationCache.Get(rd.LocationMAC); ok {
+		location = l.(models.Location)
+	} else {
+		fmt.Printf("unable to fetch location %s\n", rd.LocationMAC)
+		return nil
+	}
+
+	devices := deviceCache.Items()
+	for m, d := range devices {
+
+		err := bcrypt.CompareHashAndPassword([]byte(m), []byte(mac))
+		if err != nil {
+			continue
+		}
+
+		device = d.Object.(models.Device)
+		break
+	}
+
+	location.Devices[string(hash)] = models.Device{ID: string(hash), Signal: rd.Signal, Vendor: device.Vendor, Name: device.Name, IP: device.IP}
+	device.Locations[rd.LocationMAC] = models.Location{MAC: rd.LocationMAC, IP: location.IP, Name: location.Name, Signal: rd.Signal}
+	fmt.Println("Setting device and location")
+	deviceCache.SetDefault(string(hash), device)
+
+	locationCache.SetDefault(rd.LocationMAC, location)
+
+	fmt.Printf("Device reading - Mac: %s, Salt: %s, Hash: %s\n", rd.DeviceMAC, Salt, string(hash))
+	insertReading(rd.LocationMAC, device.ID, rd.Signal, rd.Timestamp)
+
 	return nil
 }
 
-func (c *ContextServer) DeviceEvent(obj interface{}, r *Reply) error {
+func (c *ContextServer) DeviceEvent(e models.DeviceEvent, r *Reply) error {
 
-	rd := obj.(*RawDevice)
+	mac := Salt + e.DeviceMAC
 
-	//what happens if it fails
-
-	mac := Salt + rd.MAC
 	hash, err := bcrypt.GenerateFromPassword([]byte(mac), 10)
 	if err != nil {
-		fmt.Println("should log, but here is error")
 		fmt.Println(err)
 	}
 
-	//we need to find out if the device exists
+	fmt.Printf("Device evebt - Mac: %s, Salt: %s, Hash: %s\n", e.DeviceMAC, Salt, string(hash))
 
-	insertReading(rd.LocationMAC, string(hash), rd.Signal, rd.Timestamp)
+	if e.Event == models.DEVICE_JOINED {
+		fmt.Println("Device joined")
+		d := models.Device{ID: string(hash), Locations: make(map[string]models.Location)}
+		deviceCache.Add(string(hash), d, cache.DefaultExpiration)
+
+		//initiate a nmap scan as a go routine --- I need to do a simulated nmap as well.
+	} else if e.Event == models.DEVICE_LEFT {
+		if d, ok := deviceCache.Get(string(hash)); ok {
+			device := d.(models.Device)
+			//remove location
+			fmt.Println(device)
+
+		}
+
+		if l, ok := locationCache.Get(e.LocationMAC); ok {
+			location := l.(models.Location)
+			fmt.Println(location)
+			//remove device
+		}
+
+		//we need to remove the location from the device -> monday
+		//we need to remove the device from the location -> monday
+
+	}
+
 	return nil
 }
 
-func (c *ContextServer) ConnectLocation(obj interface{}, r *Reply) error {
-	fmt.Println("Connecting location LKHFALKSFHSAHKFSHAFKSKADFHKKASFHKDSJFHDKSJFH")
-	fmt.Println(obj)
+func (c *ContextServer) ConnectLocation(l models.Location, r *Reply) error {
+	fmt.Println("connecting location")
+	l.Devices = make(map[string]models.Device)
+	err := locationCache.Add(l.MAC, l, cache.DefaultExpiration)
+	if err != nil {
+		fmt.Println("ConnectLocation err")
+		fmt.Println(err)
+	}
 	return nil
 }
 
-func locationEvicted(mac string, l interface{}) {
-	/*
-		location := l(*device.Location)
-		fmt.Printf("Location evicted %+v\n", location)
-	*/
+func locationEvicted(mac string, i interface{}) {
+	fmt.Println("location evicted !!!!!!!!!!!!!!!!!!!")
+	location := i.(models.Location)
+	fmt.Printf("Location evicted %+v\n", location)
 }
 
 //Run starts the context server
@@ -140,26 +194,3 @@ func randSeq(n int) string {
 	}
 	return string(b)
 }
-
-/*
-
-Clients need to know the ip and port -- we should use the existing
-
-
-What do we need:
-
-Security/privacy
-
-func GetPublicKey()
-
-Master/Slave scenarion or how to avoid race conditions:
-
-This means that each node needs to know who is below or above them in terms of numbers?
-
-func AnybodyOutThere()
-func GetNodeList()
-func ReportNode()
-
-
-
-*/
