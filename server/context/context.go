@@ -1,4 +1,4 @@
-package contextserver
+package context
 
 import (
 	"crypto/rand"
@@ -19,7 +19,7 @@ import (
 var (
 	deviceCache   = cache.New(cache.NoExpiration, cache.NoExpiration)
 	locationCache = cache.New(10*time.Second, 30*time.Second) // prolly should only rarely expire!
-	Salt          string
+	salt          string
 )
 
 type Reply struct {
@@ -27,14 +27,14 @@ type Reply struct {
 	Peers   []string
 }
 
-type ContextServer struct {
+type nmapDevice struct {
+	MAC    string
+	IP     string
+	Vendor string
+	Name   string
 }
 
-type RawDevice struct {
-	MAC         string
-	Signal      int
-	LocationMAC string
-	Timestamp   time.Time
+type Context struct {
 }
 
 type Device struct {
@@ -50,11 +50,13 @@ type Device struct {
 func Run() {
 	fmt.Println("Running context server")
 	initSqliteDB()
-	Salt = randSeq(8)
+	salt = randSeq(8)
 
 	locationCache.OnEvicted(locationEvicted)
 
-	server := new(ContextServer)
+	//nmapChannel = make(chan nmapDevice)
+
+	server := new(Context)
 	rpc.Register(server)
 
 	config, err := configuration.GetTLSServerConfig()
@@ -81,9 +83,9 @@ func Run() {
 	}
 }
 
-func (c *ContextServer) DeviceReading(rd models.Reading, r *Reply) error {
+func (c *Context) DeviceReading(rd models.Reading, r *Reply) error {
 
-	mac := Salt + rd.DeviceMAC
+	mac := salt + rd.DeviceMAC
 
 	//we only do that on insert
 	hash, err := bcrypt.GenerateFromPassword([]byte(mac), 10)
@@ -93,7 +95,6 @@ func (c *ContextServer) DeviceReading(rd models.Reading, r *Reply) error {
 	}
 
 	var location models.Location
-	var device models.Device
 
 	if l, ok := locationCache.Get(rd.LocationMAC); ok {
 		location = l.(models.Location)
@@ -102,10 +103,87 @@ func (c *ContextServer) DeviceReading(rd models.Reading, r *Reply) error {
 		return nil
 	}
 
+	device, err := getDeviceFromCache(rd.DeviceMAC)
+	if err != nil {
+		return nil
+	}
+
+	location.Devices[string(hash)] = models.Device{ID: string(hash), Signal: rd.Signal, Vendor: device.Vendor, Name: device.Name, IP: device.IP}
+	device.Locations[rd.LocationMAC] = models.Location{MAC: rd.LocationMAC, IP: location.IP, Name: location.Name, Signal: rd.Signal}
+	deviceCache.SetDefault(string(hash), device)
+	locationCache.SetDefault(rd.LocationMAC, location)
+
+	insertReading(rd.LocationMAC, device.ID, rd.Signal, rd.Timestamp)
+
+	return nil
+}
+
+func (c *Context) DeviceEvent(e models.DeviceEvent, r *Reply) error {
+
+	if e.Event == models.DEVICE_JOINED {
+		mac := salt + e.DeviceMAC
+
+		hash, err := bcrypt.GenerateFromPassword([]byte(mac), 10)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		d := models.Device{ID: string(hash), Locations: make(map[string]models.Location)}
+		fmt.Printf("Device joined mac: %s, device: %+v\n", e.DeviceMAC, d)
+		deviceCache.Add(string(hash), d, cache.DefaultExpiration)
+
+		nmapChannel := make(chan nmapDevice)
+		go nmapScan(e.DeviceMAC, nmapChannel)
+		go func() {
+			for {
+				select {
+				case d := <-nmapChannel:
+					device, err := getDeviceFromCache(d.MAC)
+					if err != nil {
+						return
+					}
+					device.IP = d.IP
+					device.Name = d.Name
+					device.Vendor = d.Vendor
+					deviceCache.SetDefault(device.ID, device)
+				}
+			}
+		}()
+
+		//EMMIT API EVENT: Target: location and device, event: device joined
+
+	} else if e.Event == models.DEVICE_LEFT {
+		var device models.Device
+
+		device, err := getDeviceFromCache(e.DeviceMAC)
+		if err != nil {
+			return nil
+		}
+
+		delete(device.Locations, e.LocationMAC)
+		if len(device.Locations) == 0 {
+			deviceCache.Delete(device.ID)
+		}
+
+		if l, ok := locationCache.Get(e.LocationMAC); ok {
+			location := l.(models.Location)
+			delete(location.Devices, device.ID)
+		}
+
+		//EMMIT API EVENT: Target: location and device, event: device left
+	}
+
+	return nil
+}
+
+func getDeviceFromCache(MACaddr string) (device models.Device, err error) {
+
+	smac := salt + MACaddr
+
 	devices := deviceCache.Items()
 	for m, d := range devices {
 
-		err := bcrypt.CompareHashAndPassword([]byte(m), []byte(mac))
+		err := bcrypt.CompareHashAndPassword([]byte(m), []byte(smac))
 		if err != nil {
 			continue
 		}
@@ -114,59 +192,10 @@ func (c *ContextServer) DeviceReading(rd models.Reading, r *Reply) error {
 		break
 	}
 
-	location.Devices[string(hash)] = models.Device{ID: string(hash), Signal: rd.Signal, Vendor: device.Vendor, Name: device.Name, IP: device.IP}
-	device.Locations[rd.LocationMAC] = models.Location{MAC: rd.LocationMAC, IP: location.IP, Name: location.Name, Signal: rd.Signal}
-	fmt.Println("Setting device and location")
-	deviceCache.SetDefault(string(hash), device)
-
-	locationCache.SetDefault(rd.LocationMAC, location)
-
-	fmt.Printf("Device reading - Mac: %s, Salt: %s, Hash: %s\n", rd.DeviceMAC, Salt, string(hash))
-	insertReading(rd.LocationMAC, device.ID, rd.Signal, rd.Timestamp)
-
-	return nil
+	return
 }
 
-func (c *ContextServer) DeviceEvent(e models.DeviceEvent, r *Reply) error {
-
-	mac := Salt + e.DeviceMAC
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(mac), 10)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	fmt.Printf("Device evebt - Mac: %s, Salt: %s, Hash: %s\n", e.DeviceMAC, Salt, string(hash))
-
-	if e.Event == models.DEVICE_JOINED {
-		fmt.Println("Device joined")
-		d := models.Device{ID: string(hash), Locations: make(map[string]models.Location)}
-		deviceCache.Add(string(hash), d, cache.DefaultExpiration)
-
-		//initiate a nmap scan as a go routine --- I need to do a simulated nmap as well.
-	} else if e.Event == models.DEVICE_LEFT {
-		if d, ok := deviceCache.Get(string(hash)); ok {
-			device := d.(models.Device)
-			//remove location
-			fmt.Println(device)
-
-		}
-
-		if l, ok := locationCache.Get(e.LocationMAC); ok {
-			location := l.(models.Location)
-			fmt.Println(location)
-			//remove device
-		}
-
-		//we need to remove the location from the device -> monday
-		//we need to remove the device from the location -> monday
-
-	}
-
-	return nil
-}
-
-func (c *ContextServer) ConnectLocation(l models.Location, r *Reply) error {
+func (c *Context) ConnectLocation(l models.Location, r *Reply) error {
 	fmt.Println("connecting location")
 	l.Devices = make(map[string]models.Device)
 	err := locationCache.Add(l.MAC, l, cache.DefaultExpiration)
@@ -178,7 +207,6 @@ func (c *ContextServer) ConnectLocation(l models.Location, r *Reply) error {
 }
 
 func locationEvicted(mac string, i interface{}) {
-	fmt.Println("location evicted !!!!!!!!!!!!!!!!!!!")
 	location := i.(models.Location)
 	fmt.Printf("Location evicted %+v\n", location)
 }
@@ -193,4 +221,12 @@ func randSeq(n int) string {
 		b[i] = letters[mrand.Intn(len(letters))]
 	}
 	return string(b)
+}
+
+func nmapScan(mac string, ch chan nmapDevice) {
+	if configuration.MODE == configuration.DEVELOPER_MODE {
+		simulateNmap(mac, ch)
+	} else {
+		fmt.Println("Run normal nmap scan")
+	}
 }

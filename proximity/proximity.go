@@ -9,7 +9,8 @@ import (
 
 	"github.com/henrikkorsgaard/here.local/configuration"
 	"github.com/henrikkorsgaard/here.local/models"
-	"github.com/henrikkorsgaard/here.local/server/contextserver"
+	"github.com/henrikkorsgaard/here.local/server/context"
+	contextserver "github.com/henrikkorsgaard/here.local/server/context"
 	"github.com/henrikkorsgaard/kalmango"
 	"github.com/patrickmn/go-cache"
 )
@@ -64,7 +65,7 @@ func connectRPC() {
 
 	l := models.Location{MAC: configuration.NODE_MAC_ADDR, IP: configuration.NODE_IP_ADDR, Name: configuration.NODE_NAME}
 	var result contextserver.Reply
-	rpcClient.Call("ContextServer.ConnectLocation", l, &result)
+	rpcClient.Call("Context.ConnectLocation", l, &result)
 	fmt.Println(result)
 
 }
@@ -77,18 +78,18 @@ func sendDevice(MAC string, Signal int) {
 		device.Signal = int(ksig)
 	} else {
 		device = Device{MAC: MAC, Signal: Signal, kalman: kalmango.NewKalmanFilter(0.5, 8, 1, 0, 1), Discovered: time.Now()}
-		var result contextserver.Reply
-		rpcClient.Call("ContextServer.DeviceEvent", models.DeviceEvent{Event: models.DEVICE_JOINED, DeviceMAC: MAC, LocationMAC: configuration.NODE_MAC_ADDR, Timestamp: time.Now()}, &result)
+		var result context.Reply
+		rpcClient.Call("Context.DeviceEvent", models.DeviceEvent{Event: models.DEVICE_JOINED, DeviceMAC: MAC, LocationMAC: configuration.NODE_MAC_ADDR, Timestamp: time.Now()}, &result)
 	}
 
-	var result contextserver.Reply
-	rpcClient.Call("ContextServer.DeviceReading", models.Reading{MAC, configuration.NODE_MAC_ADDR, Signal, time.Now()}, &result)
+	var result context.Reply
+	rpcClient.Call("Context.DeviceReading", models.Reading{MAC, configuration.NODE_MAC_ADDR, Signal, time.Now()}, &result)
 	deviceCache.Set(MAC, device, cache.DefaultExpiration)
 }
 
 func deviceEvicted(MAC string, i interface{}) {
 	device := i.(Device)
 	fmt.Printf("Evicting device: %+v", device)
-	var result contextserver.Reply
-	rpcClient.Call("ContextServer.DeviceEvent", models.DeviceEvent{Event: models.DEVICE_LEFT, DeviceMAC: MAC, LocationMAC: configuration.NODE_MAC_ADDR, Timestamp: time.Now()}, &result)
+	var result context.Reply
+	rpcClient.Call("Context.DeviceEvent", models.DeviceEvent{Event: models.DEVICE_LEFT, DeviceMAC: MAC, LocationMAC: configuration.NODE_MAC_ADDR, Timestamp: time.Now()}, &result)
 }

@@ -31,7 +31,7 @@ func Init() {
 	if err != nil {
 		logging.Fatal(err)
 	}
-
+	//TODO READ THE CONFIG!
 	if runtime.GOOS != "linux" {
 		initDevMode()
 	} else {

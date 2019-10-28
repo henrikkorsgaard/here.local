@@ -1,4 +1,4 @@
-package contextserver
+package context
 
 import (
 	"database/sql"
