@@ -1,17 +1,27 @@
-
 package configuration
-
-//THIS FILE IS REDUNDANT AS SOON AS I HAVE COPIED OVER THE CODE
-
-/*
 
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"os"
+	"os/user"
 	"regexp"
+	"runtime"
 	"time"
+
+	"github.com/spf13/viper"
+
+	"github.com/henrikkorsgaard/here.local/logging"
+)
+
+var (
+	MODE                string
+	CONTEXT_SERVER_ADDR string
+	NODE_MAC_ADDR       string
+	NODE_IP_ADDR        string
+	NODE_NAME           string
 )
 
 const (
@@ -21,40 +31,105 @@ const (
 	DEVELOPER_MODE = "DEVELOPER"
 )
 
-/*
+//Init initialises the sensing node network, certificate and user configuration.
 func init() {
+	fmt.Println("Initialising node configuration")
 	usr, err := user.Current()
 	if err != nil {
-		log.Fatal("YOU NEED TO RUN HERE.LOCAL AS ROOT")
+		logging.Fatal(err)
 	}
 
-	if usr.Uid != "0" && usr.Gid != "0" {
-		log.Fatal("YOU NEED TO RUN HERE.LOCAL AS ROOT")
-	}
-
-	devMode = viper.GetBool("dev") // retreive value from viper
+	var cfpath string
 	if runtime.GOOS != "linux" {
-		loadDeveloperConfiguration()
+		cfpath = "."
+		MODE = DEVELOPER_MODE
 	} else {
-		loadConfiguration()
-		configureNetworkDevices()
+		if usr.Uid != "0" && usr.Gid != "0" {
+			log.Fatal("YOU NEED TO RUN HERE.LOCAL AS ROOT")
+		} else {
+			cfpath = "/boot/"
+		}
+	}
+
+	if _, err := os.Stat(cfname); os.IsNotExist(err) {
+		input, err := ioutil.ReadFile("./here.local.config.toml.template")
+		logging.Fatal(err)
+
+		err = ioutil.WriteFile("./here.local.config.toml", input, 0644)
+		logging.Fatal(err)
+	}
+
+	viper.SetConfigName("here.local.config")
+	viper.AddConfigPath(cfpath)
+	err = viper.ReadInConfig()
+	logging.Fatal(err)
+
+	if MODE != DEVELOPER_MODE {
+		var err error
+
+		hostname, err := os.Hostname()
+		logging.Fatal(err)
+
+		if LOCATION() == "" {
+			newHostname := "HERE-" + randSeq(4)
+			setLocation(newHostname)
+			err = changeHostname(newHostname)
+			logging.Fatal(err)
+			reboot()
+		} else if LOCATION() != hostname {
+			err = changeHostname(LOCATION())
+			logging.Fatal(err)
+			reboot()
+		}
+	} else {
+		CONTEXT_SERVER_ADDR = "localhost:1339"
+		NODE_MAC_ADDR = "00:00:00:00:00:00"
+		NODE_IP_ADDR = "127.0.0.1"
+		NODE_NAME = "dev-home"
 	}
 }
 
+//SSID returns ssid from the config
+func SSID() string {
+	return viper.GetString("network.ssid")
+}
 
+//SSID_PASSWORD returns network password from the config
+func SSID_PASSWORD() string {
+	return viper.GetString("network.password")
+}
 
-// exists returns whether the given file or directory exists
-// https://stackoverflow.com/a/10510783
-func fileOrDirExists(path string) (bool, error) {
-	_, err := os.Stat(path)
+//LOCATION returns location from the config
+func LOCATION() string {
+	return viper.GetString("node.location")
+}
 
-	if err == nil {
-		return true, nil
+func setLocation(l string) {
+	viper.Set("node.location", l)
+	viper.WriteConfig()
+}
+
+func generateValidHostname(hostname string) string {
+	re := regexp.MustCompile(`[^a-zA-Z0-9--]`)
+	str := re.ReplaceAllString(hostname, "")
+	if len(str) > 32 {
+		str = str[0:32]
 	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return true, err
+	return str
+}
+
+func setLocation(l string) {
+	LOCATION = l
+
+}
+
+func delayedReboot() {
+	time.Sleep(2 * time.Second)
+	reboot()
+}
+
+func reboot() {
+	runCommand("sudo reboot now")
 }
 
 func randSeq(n int) string {
@@ -67,8 +142,7 @@ func randSeq(n int) string {
 	return string(b)
 }
 
-func changeHostname(hostname string, rebootNode bool) (err error) {
-	fmt.Println(hostname)
+func changeHostname(hostname string) (err error) {
 	_, stderr, _ := runCommand("sudo hostnamectl set-hostname " + hostname)
 
 	if stderr != "" {
@@ -88,36 +162,5 @@ func changeHostname(hostname string, rebootNode bool) (err error) {
 		return
 	}
 
-	if rebootNode {
-		//we can't ignore a restart here becuase of the "sudo: unable to resolve host" issue
-		reboot()
-	}
-
 	return nil
 }
-
-//we need to ensure that the hostname is a) a valid hostname and b) a valid ssid
-//meaning: < 32 chars and only 0-9,a-b, A-Z, -
-func generateValidHostname(hostname string) string {
-	re := regexp.MustCompile(`[^a-zA-Z0-9--]`)
-	str := re.ReplaceAllString(hostname, "")
-	if len(str) > 32 {
-		str = str[0:32]
-	}
-	return str
-}
-
-func writeConfig() {
-
-		err := configViper.WriteConfig()
-		logging.Fatal(err)
-}
-
-func delayedReboot() {
-	time.Sleep(2 * time.Second)
-	reboot()
-}
-
-func reboot() {
-	runCommand("sudo reboot now")
-}*/
