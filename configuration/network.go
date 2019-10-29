@@ -24,14 +24,14 @@ var (
 //	scanInterface    *wifi.Interface
 )
 
-func configureNetworkDevices() {
+func configureNetworkInterfaces() {
 	logging.Info("Configuring network.")
 
-	mainPhyInterface, err := detectCompatibleNetworkDevice()
+	mainPhyInterface, err := detectCompatibleNetworkInterface()
 	logging.Fatal(err)
 
 	logging.Info("Found compatible network device " + mainPhyInterface.Name)
-
+	/*
 	monitorInterface, err = detectMonitorInterface(mainPhyInterface)
 	logging.Fatal(err)
 
@@ -51,50 +51,49 @@ func configureNetworkDevices() {
 		setupWifiConnection()
 	} else {
 		setupAccessPoint()
-	}
+	}*/
 }
 
-func detectCompatibleNetworkDevice() (phy *wifi.PHY, err error) {
-	/*
+func detectCompatibleNetworkInterface() (phy *wifi.PHY, err error) {
 
-		c, err := wifi.New()
-		defer c.Close()
-		if err != nil {
-			return
-		}
 
-		phys, err := c.PHYs()
-		if err != nil {
-			return
-		}
+	c, err := wifi.New()
+	defer c.Close()
+	if err != nil {
+		return
+	}
 
-		for _, phyIface := range phys {
-			var monitor bool
-			var accessPoint bool
+	phys, err := c.PHYs()
+	if err != nil {
+		return
+	}
 
-			//we need to check if the interface supports access point and monitor interface types
-			// we do not check possible interface combinations as we assume:
-			// that access point will always run isolated
-			// and that we can run monitor and station simultaniusly
-			for _, supportedIfaceType := range phyIface.SupportedIftypes {
-				if supportedIfaceType == wifi.InterfaceTypeAP {
-					accessPoint = true
-				}
+	for _, phyIface := range phys {
+		var monitor bool
+		var accessPoint bool
 
-				if supportedIfaceType == wifi.InterfaceTypeMonitor {
-					monitor = true
-				}
+		//we need to check if the interface supports access point and monitor interface types
+		// we do not check possible interface combinations as we assume:
+		// that access point will always run isolated
+		// and that we can run monitor and station simultaniusly
+		for _, supportedIfaceType := range phyIface.SupportedIftypes {
+			if supportedIfaceType == wifi.InterfaceTypeAP {
+				accessPoint = true
 			}
-
-			if monitor && accessPoint {
-				phy = phyIface
+			if supportedIfaceType == wifi.InterfaceTypeMonitor {
+				monitor = true
 			}
 		}
 
-		if phy == nil {
-			err = fmt.Errorf("Unable to detect compantible physical wifi device")
+		if monitor && accessPoint {
+			phy = phyIface
 		}
-	*/
+	}
+
+	if phy == nil {
+		err = fmt.Errorf("Unable to detect compantible physical wifi device")
+	}
+
 	return
 }
 

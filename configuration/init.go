@@ -84,6 +84,8 @@ func init() {
 			logging.Fatal(err)
 			reboot()
 		}
+
+		configureNetworkInterfaces()
 	} else {
 		CONTEXT_SERVER_ADDR = "localhost:1339"
 		NODE_MAC_ADDR = "00:00:00:00:00:00"
