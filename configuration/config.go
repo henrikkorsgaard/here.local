@@ -18,7 +18,9 @@ var (
 	NODE_MAC_ADDR       string
 	NODE_IP_ADDR        string
 	NODE_NAME           string
-
+	SSID string
+	SSID_PASSWORD string
+	LOCATION string
 	config *goconfig.Config
 )
 
@@ -30,7 +32,7 @@ const (
 )
 
 //Init initialises the sensing node network, certificate and user configuration.
-func Init() {
+func init() {
 	fmt.Println("Initialising node configuration")
 	usr, err := user.Current()
 	if err != nil {
@@ -43,9 +45,9 @@ func Init() {
 		MODE = DEVELOPER_MODE
 	} else {
 		if usr.Uid != "0" && usr.Gid != "0" {
-			cfname = "/boot/here.local.config.toml"
-		} else {
 			log.Fatal("YOU NEED TO RUN HERE.LOCAL AS ROOT")
+		} else {
+			cfname = "/boot/here.local.config.toml"
 		}
 	}
 
@@ -62,7 +64,19 @@ func Init() {
 	config = goconfig.NewConfig([]goconfig.Provider{cl})
 
 	if MODE != DEVELOPER_MODE {
-		//we need to configure everything from the grounds up now
+		var err error
+		SSID, err =  config.String("network.ssid")
+		SSID_PASSWORD, err = config.String("network.password")
+		LOCATION, err = config.String("node.location")
+		logging.Fatal(err)
+
+
+		if LOCATION == "" {
+		 //generate
+		 //change hostname and reboot
+		} LOCATION != "hostname" {
+		 //change hostname and reboot
+		}
 	} else {
 		CONTEXT_SERVER_ADDR = "localhost:1339"
 		NODE_MAC_ADDR = "00:00:00:00:00:00"

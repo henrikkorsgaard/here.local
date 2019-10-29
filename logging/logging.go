@@ -27,7 +27,11 @@ func init() {
 
 	} else {
 		if usr.Uid != "0" && usr.Gid != "0" {
-			file, err := os.OpenFile("/boot/here.local.log", os.O_CREATE|os.O_WRONLY, 0666)
+	
+
+		log.Fatal("YOU NEED TO RUN HERE.LOCAL AS ROOT")
+		} else {
+				file, err := os.OpenFile("/boot/here.local.log", os.O_CREATE|os.O_WRONLY, 0666)
 			if err == nil {
 				logger.Out = file
 				logger.SetLevel(logrus.InfoLevel)
@@ -35,8 +39,7 @@ func init() {
 				log.Fatal("Unable to open log file /boot/here.local.log!")
 			}
 
-		} else {
-			log.Fatal("YOU NEED TO RUN HERE.LOCAL AS ROOT")
+
 		}
 	}
 }

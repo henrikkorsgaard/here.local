@@ -7,7 +7,7 @@
   password = ""
   ssid = ""
 
-[device]
+[node]
   document = ""
   location = ""
 

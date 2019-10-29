@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+//	"io/ioutil"
 	"net"
 	"os/exec"
 	"strings"
@@ -26,38 +26,37 @@ var (
 func configureNetworkDevices() {
 	logging.Info("Configuring network.")
 
-	/*
-		mainPhyInterface, err := detectCompatibleNetworkDevice()
-		logging.Fatal(err)
+	mainPhyInterface, err := detectCompatibleNetworkDevice()
+	logging.Fatal(err)
 
-		logging.Info("Found compatible network device " + mainPhyInterface.Name)
+	logging.Info("Found compatible network device " + mainPhyInterface.Name)
 
-		monitorInterface, err = detectMonitorInterface(mainPhyInterface)
-		logging.Fatal(err)
+	monitorInterface, err = detectMonitorInterface(mainPhyInterface)
+	logging.Fatal(err)
 
-		logging.Info("Setting up here-monitor interface")
+	logging.Info("Setting up here-monitor interface")
 
-		wlanInterface, err = detectWLANInterface(mainPhyInterface)
-		logging.Fatal(err)
+	wlanInterface, err = detectWLANInterface(mainPhyInterface)
+	logging.Fatal(err)
 
 		//	scanInterface, err = detectScanInterface(wlanInterface)
 		//	logging.Fatal(err)
 
-		logging.Info("Setting up wlan interface")
+	logging.Info("Setting up wlan interface")
 
-		ssid := configViper.GetString("network.ssid")
-		if ssid == "" {
-			setupAccessPoint()
-		} else if ok := isNetworkAvailable(ssid, wlanInterface); ok {
-			setupWifiConnection()
-		} else {
-			setupAccessPoint()
-		}
-
-	*/
+	
+	if SSID == "" {
+		setupAccessPoint()
+	} else if ok := isNetworkAvailable(ssid, wlanInterface); ok {
+		setupWifiConnection()
+	} else {
+		setupAccessPoint()
+	}
 }
 
 func detectCompatibleNetworkDevice() (phy *wifi.PHY, err error) {
+	/*
+
 	c, err := wifi.New()
 	defer c.Close()
 	if err != nil {
@@ -95,11 +94,12 @@ func detectCompatibleNetworkDevice() (phy *wifi.PHY, err error) {
 	if phy == nil {
 		err = fmt.Errorf("Unable to detect compantible physical wifi device")
 	}
-
+	*/
 	return
 }
 
 func detectScanInterface(wlan *wifi.Interface) (scanIface *wifi.Interface, err error) {
+	/*
 	c, err := wifi.New()
 	defer c.Close()
 	if err != nil {
@@ -134,12 +134,12 @@ func detectScanInterface(wlan *wifi.Interface) (scanIface *wifi.Interface, err e
 		}
 
 	}
-
+*/
 	return
 }
 
 func detectMonitorInterface(phy *wifi.PHY) (monIface *net.Interface, err error) {
-
+/*
 	monIface, _ = net.InterfaceByName("here-monitor")
 
 	if monIface == nil {
@@ -165,11 +165,12 @@ func detectMonitorInterface(phy *wifi.PHY) (monIface *net.Interface, err error) 
 			return
 		}
 	}
-
+*/
 	return
 }
 
 func detectWLANInterface(phy *wifi.PHY) (wlanIface *wifi.Interface, err error) {
+/*
 	c, err := wifi.New()
 	defer c.Close()
 	if err != nil {
@@ -217,12 +218,12 @@ func detectWLANInterface(phy *wifi.PHY) (wlanIface *wifi.Interface, err error) {
 			return
 		}
 	}
-
+*/
 	return
 }
 
 func setupAccessPoint() {
-
+/*
 	logging.Info("Setting up Access Point")
 	fmt.Println("Setting up Access Point")
 
@@ -276,6 +277,7 @@ func setupAccessPoint() {
 }
 
 func setupWifiConnection() {
+/*
 	logging.Info("Setting up WLAN conncection")
 	password := configViper.GetString("network.password")
 	ssid := configViper.GetString("network.ssid")
@@ -290,6 +292,11 @@ func setupWifiConnection() {
 	} else {
 		logging.Info("Unable to connect to network named " + ssid + ". Password to short for WPA (HERE.LOCAL do not support WEB as is)")
 		setupAccessPoint()
+		return
+	}
+
+	str := "allow-hotplug eth0\nauto eth0\niface eth0 inet dhcp\n\n"
+	str += "allow-hotplug " + wlanInterface.Name + "\nauto " + wlanInterface.Name + "\niface " + wlanInterface.Name + " inet dhcp\n"
 		return
 	}
 
@@ -329,9 +336,11 @@ func setupWifiConnection() {
 	}
 
 	logging.Info("WLAN configured and connected to " + ssid + " with ip " + ip + " in " + envViper.GetString("mode") + " mode.")
+*/
 }
 
 func detectIP(wlanIface *wifi.Interface) (ip string, err error) {
+/*
 	wlan, err := net.InterfaceByName(wlanIface.Name)
 	if err != nil {
 		return ip, err
@@ -348,11 +357,12 @@ func detectIP(wlanIface *wifi.Interface) (ip string, err error) {
 			}
 		}
 	}
-
+*/
 	return ip, err
 }
 
 func restartNetworkService() error {
+
 	_, stderr, err := runCommand("sudo systemctl restart networking.service")
 	if err != nil {
 		return err
@@ -363,6 +373,7 @@ func restartNetworkService() error {
 	}
 
 	return nil
+
 }
 
 func startAccessPointServices() error {
@@ -435,14 +446,14 @@ func isNetworkAvailable(ssid string, iface *wifi.Interface) bool {
 }
 
 func getSSIDList() (ssids []string) {
-	mode := envViper.GetString("mode")
+	
 
 	var stdout, stderr string
 	var err error
 
 	fmt.Println("we got this far, right?")
 
-	if mode == "CONFIG" {
+	if MODE == CONFIG_MODE {
 		//if scanInterface != nil {
 		//	stdout, stderr, err = runCommand("sudo iw " + scanInterface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
 		//} else {
@@ -533,15 +544,6 @@ func detectMasterMode() (bool, error) {
 	isAP = true
 */
 
-func runCommand(command string) (stdout string, stderr string, err error) {
-	cmd := exec.Command("/bin/sh", "-c", command)
-	var stdoutBuffer, stderrBuffer bytes.Buffer
-	cmd.Stdout = &stdoutBuffer
-	cmd.Stderr = &stderrBuffer
-	err = cmd.Run()
-	if err != nil {
-		return "", "", err
-	}
 
-	return string(stdoutBuffer.Bytes()), string(stderrBuffer.Bytes()), err
-}
+
+
