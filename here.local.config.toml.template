@@ -1,0 +1,14 @@
+
+[authentication]
+  login = ""
+  password = ""
+
+[network]
+  password = ""
+  ssid = ""
+
+[device]
+  document = ""
+  location = ""
+
+

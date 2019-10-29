@@ -2,9 +2,16 @@ package configuration
 
 import (
 	"bytes"
+	"context"
+	"fmt"
+	"io/ioutil"
 	"net"
 	"os/exec"
+	"strings"
+	"time"
 
+	"github.com/grandcat/zeroconf"
+	"github.com/henrikkorsgaard/here.local/logging"
 	"github.com/henrikkorsgaard/wifi"
 )
 
@@ -16,36 +23,38 @@ var (
 //	scanInterface    *wifi.Interface
 )
 
-/*
 func configureNetworkDevices() {
 	logging.Info("Configuring network.")
 
-	mainPhyInterface, err := detectCompatibleNetworkDevice()
-	logging.Fatal(err)
+	/*
+		mainPhyInterface, err := detectCompatibleNetworkDevice()
+		logging.Fatal(err)
 
-	logging.Info("Found compatible network device " + mainPhyInterface.Name)
+		logging.Info("Found compatible network device " + mainPhyInterface.Name)
 
-	monitorInterface, err = detectMonitorInterface(mainPhyInterface)
-	logging.Fatal(err)
+		monitorInterface, err = detectMonitorInterface(mainPhyInterface)
+		logging.Fatal(err)
 
-	logging.Info("Setting up here-monitor interface")
+		logging.Info("Setting up here-monitor interface")
 
-	wlanInterface, err = detectWLANInterface(mainPhyInterface)
-	logging.Fatal(err)
+		wlanInterface, err = detectWLANInterface(mainPhyInterface)
+		logging.Fatal(err)
 
-//	scanInterface, err = detectScanInterface(wlanInterface)
-//	logging.Fatal(err)
+		//	scanInterface, err = detectScanInterface(wlanInterface)
+		//	logging.Fatal(err)
 
-	logging.Info("Setting up wlan interface")
+		logging.Info("Setting up wlan interface")
 
-	ssid := configViper.GetString("network.ssid")
-	if ssid == "" {
-		setupAccessPoint()
-	} else if ok := isNetworkAvailable(ssid, wlanInterface); ok {
-		setupWifiConnection()
-	} else {
-		setupAccessPoint()
-	}
+		ssid := configViper.GetString("network.ssid")
+		if ssid == "" {
+			setupAccessPoint()
+		} else if ok := isNetworkAvailable(ssid, wlanInterface); ok {
+			setupWifiConnection()
+		} else {
+			setupAccessPoint()
+		}
+
+	*/
 }
 
 func detectCompatibleNetworkDevice() (phy *wifi.PHY, err error) {
@@ -118,7 +127,7 @@ func detectScanInterface(wlan *wifi.Interface) (scanIface *wifi.Interface, err e
 	}
 
 	if scanNetIface.Flags&net.FlagUp == 0 {
-		_, _, err = runCommand("sudo ifconfig "+ scanNetIface.Name + " up")
+		_, _, err = runCommand("sudo ifconfig " + scanNetIface.Name + " up")
 		if err != nil || scanNetIface.Flags&net.FlagUp == 0 {
 			scanIface = nil
 			return
@@ -255,15 +264,15 @@ func setupAccessPoint() {
 	logging.Fatal(err)
 
 	/*
-		//systemctl unmask name.service
-		//https://askubuntu.com/a/1017315
+			//systemctl unmask name.service
+			//https://askubuntu.com/a/1017315
 
 
-	envViper.Set("ip", "10.0.10.1")
-	envViper.Set("station", wlanInterface.HardwareAddr.String())
-	envViper.Set("mode", "CONFIG")
-	fmt.Println("this far")
-	logging.Info("Access Point configured with ssid: " + configViper.GetString("node.location") + ", ip: 10.0.10.1, in CONFIG mode!")
+		envViper.Set("ip", "10.0.10.1")
+		envViper.Set("station", wlanInterface.HardwareAddr.String())
+		envViper.Set("mode", "CONFIG")
+		fmt.Println("this far")
+		logging.Info("Access Point configured with ssid: " + configViper.GetString("node.location") + ", ip: 10.0.10.1, in CONFIG mode!")*/
 }
 
 func setupWifiConnection() {
@@ -437,15 +446,14 @@ func getSSIDList() (ssids []string) {
 		//if scanInterface != nil {
 		//	stdout, stderr, err = runCommand("sudo iw " + scanInterface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
 		//} else {
-			stopAccessPointServices()
-			stdout, stderr, err = runCommand("sudo iw " + wlanInterface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
-			startAccessPointServices()
+		stopAccessPointServices()
+		stdout, stderr, err = runCommand("sudo iw " + wlanInterface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
+		startAccessPointServices()
 		//}
 
 	} else {
 		stdout, stderr, err = runCommand("sudo iw " + wlanInterface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
 	}
-
 
 	logging.Fatal(err)
 	if stderr != "" {
