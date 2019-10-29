@@ -39,23 +39,26 @@ func init() {
 		logging.Fatal(err)
 	}
 
-	var cfpath string
+	var cfpath string //for viper
+	var cfpathfull string //for copying config file if not existing
 	if runtime.GOOS != "linux" {
 		cfpath = "."
+		cfpathfull = "./here.local.config.toml"
 		MODE = DEVELOPER_MODE
 	} else {
 		if usr.Uid != "0" && usr.Gid != "0" {
 			log.Fatal("YOU NEED TO RUN HERE.LOCAL AS ROOT")
 		} else {
 			cfpath = "/boot/"
+			cfpathfull = "/boot/here.local.config.toml"
 		}
 	}
 
-	if _, err := os.Stat(cfname); os.IsNotExist(err) {
-		input, err := ioutil.ReadFile("./here.local.config.toml.template")
+	if _, err := os.Stat(cfpathfull); os.IsNotExist(err) {
+		input, err := ioutil.ReadFile("here.local.config.toml.template")
 		logging.Fatal(err)
 
-		err = ioutil.WriteFile("./here.local.config.toml", input, 0644)
+		err = ioutil.WriteFile(cfpathfull, input, 0644)
 		logging.Fatal(err)
 	}
 
@@ -116,11 +119,6 @@ func generateValidHostname(hostname string) string {
 		str = str[0:32]
 	}
 	return str
-}
-
-func setLocation(l string) {
-	LOCATION = l
-
 }
 
 func delayedReboot() {

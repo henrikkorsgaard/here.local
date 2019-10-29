@@ -45,9 +45,9 @@ func configureNetworkDevices() {
 
 	logging.Info("Setting up wlan interface")
 
-	if SSID == "" {
+	if SSID() == "" {
 		setupAccessPoint()
-	} else if ok := isNetworkAvailable(SSID, wlanInterface); ok {
+	} else if ok := isNetworkAvailable(SSID(), wlanInterface); ok {
 		setupWifiConnection()
 	} else {
 		setupAccessPoint()
