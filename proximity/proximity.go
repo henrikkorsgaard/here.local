@@ -45,15 +45,15 @@ func Run() {
 	mode := configuration.MODE
 	if mode == configuration.DEVELOPER_MODE {
 		simulate()
-	} else {
-
+	} else if mode != configuration.CONFIG_MODE {
+		monitorNetwork()
 	}
 
 }
 
 func connectRPC() {
 	fmt.Println("Connecting proximity sensor to context server")
-	conn, err := tls.Dial("tcp", configuration.CONTEXT_SERVER_ADDR, &configTLS)
+	conn, err := tls.Dial("tcp", "here.local:1337", &configTLS)
 	if err != nil {
 		fmt.Println("Unable to establish RCP connection")
 		fmt.Println("Trying again in a second")
@@ -79,11 +79,11 @@ func sendDevice(MAC string, Signal int) {
 	} else {
 		device = Device{MAC: MAC, Signal: Signal, kalman: kalmango.NewKalmanFilter(0.5, 8, 1, 0, 1), Discovered: time.Now()}
 		var result context.Reply
-		rpcClient.Call("Context.DeviceEvent", models.DeviceEvent{Event: models.DEVICE_JOINED, DeviceMAC: MAC, LocationMAC: configuration.NODE_MAC_ADDR, Timestamp: time.Now()}, &result)
+		rpcClient.Call("Context.DeviceEvent", models.DeviceEvent{Event: models.DEVICE_JOINED, DeviceMAC: MAC, LocationMAC: configuration.MAC, Timestamp: time.Now()}, &result)
 	}
 
 	var result context.Reply
-	rpcClient.Call("Context.DeviceReading", models.Reading{MAC, configuration.NODE_MAC_ADDR, Signal, time.Now()}, &result)
+	rpcClient.Call("Context.DeviceReading", models.Reading{MAC, configuration.MAC, Signal, time.Now()}, &result)
 	deviceCache.Set(MAC, device, cache.DefaultExpiration)
 }
 
@@ -92,4 +92,8 @@ func deviceEvicted(MAC string, i interface{}) {
 	fmt.Printf("Evicting device: %+v", device)
 	var result context.Reply
 	rpcClient.Call("Context.DeviceEvent", models.DeviceEvent{Event: models.DEVICE_LEFT, DeviceMAC: MAC, LocationMAC: configuration.NODE_MAC_ADDR, Timestamp: time.Now()}, &result)
+}
+
+func monitorWifiMetwork(){
+	
 }

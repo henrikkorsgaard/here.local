@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	//	"io/ioutil"
+	"io/ioutil"
 	"net"
 	"os/exec"
 	"strings"
@@ -31,7 +31,7 @@ func configureNetworkInterfaces() {
 	logging.Fatal(err)
 
 	logging.Info("Found compatible network device " + mainPhyInterface.Name)
-	/*
+
 	monitorInterface, err = detectMonitorInterface(mainPhyInterface)
 	logging.Fatal(err)
 
@@ -40,6 +40,7 @@ func configureNetworkInterfaces() {
 	wlanInterface, err = detectWLANInterface(mainPhyInterface)
 	logging.Fatal(err)
 
+	fmt.Println(SSID())
 	//	scanInterface, err = detectScanInterface(wlanInterface)
 	//	logging.Fatal(err)
 
@@ -51,7 +52,7 @@ func configureNetworkInterfaces() {
 		setupWifiConnection()
 	} else {
 		setupAccessPoint()
-	}*/
+	}
 }
 
 func detectCompatibleNetworkInterface() (phy *wifi.PHY, err error) {
@@ -98,7 +99,7 @@ func detectCompatibleNetworkInterface() (phy *wifi.PHY, err error) {
 }
 
 func detectScanInterface(wlan *wifi.Interface) (scanIface *wifi.Interface, err error) {
-	/*
+
 		c, err := wifi.New()
 		defer c.Close()
 		if err != nil {
@@ -133,12 +134,12 @@ func detectScanInterface(wlan *wifi.Interface) (scanIface *wifi.Interface, err e
 			}
 
 		}
-	*/
+
 	return
 }
 
 func detectMonitorInterface(phy *wifi.PHY) (monIface *net.Interface, err error) {
-	/*
+
 		monIface, _ = net.InterfaceByName("here-monitor")
 
 		if monIface == nil {
@@ -164,12 +165,12 @@ func detectMonitorInterface(phy *wifi.PHY) (monIface *net.Interface, err error) 
 				return
 			}
 		}
-	*/
+
 	return
 }
 
 func detectWLANInterface(phy *wifi.PHY) (wlanIface *wifi.Interface, err error) {
-	/*
+
 		c, err := wifi.New()
 		defer c.Close()
 		if err != nil {
@@ -217,14 +218,15 @@ func detectWLANInterface(phy *wifi.PHY) (wlanIface *wifi.Interface, err error) {
 				return
 			}
 		}
-	*/
+
 	return
 }
 
 func setupAccessPoint() {
-	/*
+
 		logging.Info("Setting up Access Point")
 		fmt.Println("Setting up Access Point")
+                /*
 
 		str := "interface=" + wlanInterface.Name + "\n"
 		str += "domain-needed\n"
@@ -276,70 +278,68 @@ func setupAccessPoint() {
 }
 
 func setupWifiConnection() {
-	/*
-		logging.Info("Setting up WLAN conncection")
-		password := configViper.GetString("network.password")
-		ssid := configViper.GetString("network.ssid")
 
-		if password == "" {
-			wpa := "network={\n\tssid=\"" + ssid + "\"\n\tkey_mgmt=NONE\n}"
-			err := ioutil.WriteFile("/etc/wpa_supplicant/wpa_supplicant.conf", []byte(wpa), 0766)
-			logging.Fatal(err)
-		} else if len(password) > 7 {
-			_, _, err := runCommand("sudo wpa_passphrase " + ssid + " " + password + " > /etc/wpa_supplicant/wpa_supplicant.conf")
-			logging.Fatal(err)
-		} else {
-			logging.Info("Unable to connect to network named " + ssid + ". Password to short for WPA (HERE.LOCAL do not support WEB as is)")
-			setupAccessPoint()
-			return
-		}
+	logging.Info("Setting up WLAN conncection")
+	password := SSID_PASSWORD()
+	ssid := SSID()
 
-		str := "allow-hotplug eth0\nauto eth0\niface eth0 inet dhcp\n\n"
-		str += "allow-hotplug " + wlanInterface.Name + "\nauto " + wlanInterface.Name + "\niface " + wlanInterface.Name + " inet dhcp\n"
-			return
-		}
-
-		str := "allow-hotplug eth0\nauto eth0\niface eth0 inet dhcp\n\n"
-		str += "allow-hotplug " + wlanInterface.Name + "\nauto " + wlanInterface.Name + "\niface " + wlanInterface.Name + " inet dhcp\n"
-		str += "\twpa_conf /etc/wpa_supplicant/wpa_supplicant.conf\n\n"
-		err := ioutil.WriteFile("/etc/network/interfaces", []byte(str), 0766)
+	if password == "" {
+		wpa := "network={\n\tssid=\"" + ssid + "\"\n\tkey_mgmt=NONE\n}"
+		err := ioutil.WriteFile("/etc/wpa_supplicant/wpa_supplicant.conf", []byte(wpa), 0766)
 		logging.Fatal(err)
-		err = restartNetworkService()
+	} else if len(password) > 7 {
+		_, _, err := runCommand("sudo wpa_passphrase " + ssid + " " + password + " > /etc/wpa_supplicant/wpa_supplicant.conf")
 		logging.Fatal(err)
+	} else {
+		logging.Info("Unable to connect to network named " + ssid + ". Password to short for WPA (HERE.LOCAL do not support WEB as is)")
+		setupAccessPoint()
+		return
+	}
 
-		station, err := detectLinkAddress(wlanInterface)
+	str := "allow-hotplug eth0\nauto eth0\niface eth0 inet dhcp\n\n"
+	str += "allow-hotplug " + wlanInterface.Name + "\nauto " + wlanInterface.Name + "\niface " + wlanInterface.Name + " inet dhcp\n"
 
-		if err != nil || station == nil {
-			logging.Info("Unable to associate WLAN with link " + ssid + "! Aborting WLAN configuration.")
-			setupAccessPoint()
-			return
-		}
+	str += "\twpa_conf /etc/wpa_supplicant/wpa_supplicant.conf\n\n"
+	err := ioutil.WriteFile("/etc/network/interfaces", []byte(str), 0766)
+	logging.Fatal(err)
+	err = restartNetworkService()
+	logging.Fatal(err)
 
-		ip, err := detectIP(wlanInterface)
-		logging.Fatal(err)
+	station, err := detectLinkAddress(wlanInterface)
 
-		if ip == "" {
-			logging.Info("Unable to accuire IP! Aborting WLAN configuration.")
-			setupAccessPoint()
-			return
-		}
+	if err != nil || station == nil {
+		logging.Info("Unable to associate WLAN with link " + ssid + "! Aborting WLAN configuration.")
+		setupAccessPoint()
+		return
+	}
 
-		envViper.Set("ip", ip)
-		envViper.Set("station", station.String())
-		masterDetected, err := detectMasterMode()
-		logging.Fatal(err)
-		if masterDetected {
-			envViper.Set("mode", "SLAVE")
-		} else {
-			envViper.Set("mode", "MASTER")
-		}
+	ip, err := detectIP(wlanInterface)
+	logging.Fatal(err)
 
-		logging.Info("WLAN configured and connected to " + ssid + " with ip " + ip + " in " + envViper.GetString("mode") + " mode.")
-	*/
+	if ip == "" {
+		logging.Info("Unable to accuire IP! Aborting WLAN configuration.")
+		setupAccessPoint()
+		return
+	}
+
+	IP = ip
+	STATION = station.String()
+	masterDetected, err := detectMasterMode()
+	logging.Fatal(err)
+	if masterDetected {
+		MODE = SLAVE_MODE
+	} else {
+		MODE = MASTER_MODE
+		//TODO: We do not have a nice way of terminating the avahi server aside from rebooting
+		go runCommand("avahi-publish -a -R here.local "+IP) //This need to run in the background
+		_, err = zeroconf.Register("here-local-context-server", "_http._tcp", "local.", 1337, []string{"txtv=0", "lo=1", "la=2"}, nil)
+	}
+
+	logging.Info("WLAN configured and connected to " + ssid + " with ip " + ip + " in " + MODE + " mode.")
+
 }
 
 func detectIP(wlanIface *wifi.Interface) (ip string, err error) {
-	/*
 		wlan, err := net.InterfaceByName(wlanIface.Name)
 		if err != nil {
 			return ip, err
@@ -356,7 +356,6 @@ func detectIP(wlanIface *wifi.Interface) (ip string, err error) {
 				}
 			}
 		}
-	*/
 	return ip, err
 }
 
@@ -364,10 +363,13 @@ func restartNetworkService() error {
 
 	_, stderr, err := runCommand("sudo systemctl restart networking.service")
 	if err != nil {
+		fmt.Println(err)
+		fmt.Println("what is this, an error")
 		return err
 	}
 
 	if stderr != "" {
+		fmt.Println("what is this, another an error")
 		return fmt.Errorf(stderr)
 	}
 
@@ -439,8 +441,8 @@ func detectLinkAddress(wlan *wifi.Interface) (addr *net.HardwareAddr, err error)
 }
 
 func isNetworkAvailable(ssid string, iface *wifi.Interface) bool {
-	stdout, _, _ := runCommand("sudo iw " + iface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
-	ok := strings.Contains(stdout, ssid+"\n")
+	stdout, _ , _ := runCommand("sudo iw " + iface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
+	ok := strings.Contains(stdout, ssid)
 	return ok
 }
 
@@ -448,8 +450,6 @@ func getSSIDList() (ssids []string) {
 
 	var stdout, stderr string
 	var err error
-
-	fmt.Println("we got this far, right?")
 
 	if MODE == CONFIG_MODE {
 		//if scanInterface != nil {

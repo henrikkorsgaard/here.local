@@ -19,9 +19,9 @@ import (
 var (
 	MODE                string
 	CONTEXT_SERVER_ADDR string
-	NODE_MAC_ADDR       string
-	NODE_IP_ADDR        string
-	NODE_NAME           string
+	MAC            string
+	IP		    string
+	STATION		    string
 )
 
 const (
@@ -88,10 +88,9 @@ func init() {
 		configureNetworkInterfaces()
 	} else {
 		CONTEXT_SERVER_ADDR = "localhost:1339"
-		NODE_MAC_ADDR = "00:00:00:00:00:00"
-		NODE_IP_ADDR = "127.0.0.1"
-		NODE_NAME = "dev-home"
-	}
+		MAC = "00:00:00:00:00:00"
+	       IP = "127.0.0.1"
+        }
 }
 
 //SSID returns ssid from the config

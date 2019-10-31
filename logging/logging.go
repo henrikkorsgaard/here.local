@@ -45,6 +45,10 @@ func init() {
 
 func Fatal(err error) {
 	if err != nil {
+		_, file, ln, ok := runtime.Caller(1)
+		if ok {
+			logger.Error("Called from ", file, " L", ln)
+		}
 		logger.Fatal(err)
 	}
 }
