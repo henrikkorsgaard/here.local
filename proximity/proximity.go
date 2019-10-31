@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/henrikkorsgaard/here.local/configuration"
+	"github.com/henrikkorsgaard/here.local/logging"
 	"github.com/henrikkorsgaard/here.local/models"
 	"github.com/henrikkorsgaard/here.local/server/context"
 	contextserver "github.com/henrikkorsgaard/here.local/server/context"
@@ -71,6 +72,7 @@ func connectRPC() {
 }
 
 func sendDevice(MAC string, Signal int) {
+	fmt.Println("Detected device with mac ", MAC, " and signal ", Signal)
 	var device Device
 	if obj, ok := deviceCache.Get(MAC); ok {
 		device = obj.(Device)
@@ -91,9 +93,54 @@ func deviceEvicted(MAC string, i interface{}) {
 	device := i.(Device)
 	fmt.Printf("Evicting device: %+v", device)
 	var result context.Reply
-	rpcClient.Call("Context.DeviceEvent", models.DeviceEvent{Event: models.DEVICE_LEFT, DeviceMAC: MAC, LocationMAC: configuration.NODE_MAC_ADDR, Timestamp: time.Now()}, &result)
+	rpcClient.Call("Context.DeviceEvent", models.DeviceEvent{Event: models.DEVICE_LEFT, DeviceMAC: MAC, LocationMAC: configuration.MAC, Timestamp: time.Now()}, &result)
 }
 
-func monitorWifiMetwork(){
-	
+func monitorWifiNetwork() {
+	handle, err := pcap.OpenLive("here-monitor", snapLen, true, pcap.BlockForever)
+	logging.Fatal(err)
+
+	monitorHandle = handle
+	defer monitorHandle.Close()
+
+	// Set filter
+	var filter = "not broadcast" //TODO: ADD DESTINATION/SOURCE TO THE FILTER TO AVOID GETTING TOO MANY PACKETS
+	err = monitorHandle.SetBPFFilter(filter)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	packetSource := gopacket.NewPacketSource(monitorHandle, monitorHandle.LinkType())
+
+	parser := gopacket.NewDecodingLayerParser(
+		layers.LayerTypeRadioTap,
+		&radioLayer,
+		&dot11layer,
+	)
+
+	foundLayerTypes := []gopacket.LayerType{}
+
+	for packet := range packetSource.Packets() {
+
+		parser.DecodeLayers(packet.Data(), &foundLayerTypes)
+
+		if len(foundLayerTypes) >= 2 && radioLayer.DBMAntennaSignal != 0 {
+
+			station := configuration.STATION
+			addr1 := dot11layer.Address1.String()
+			addr2 := dot11layer.Address2.String()
+			addr3 := dot11layer.Address3.String()
+
+			//see: https://networkengineering.stackexchange.com/questions/25100/four-layer-2-addresses-in-802-11-frame-header
+			//The ideal case for capturing signal strength between the node and device
+			//is when addr1 and addr3 is equal to the station mac and addr2 is not equal
+			//to station mac
+
+			if addr1 == station && addr3 == station && addr2 != station {
+				signal := radioLayer.DBMAntennaSignal
+				mac := dot11layer.Address2.String()
+				sendDevice(mac, int(signal))
+			}
+		}
+	}
 }
