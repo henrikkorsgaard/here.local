@@ -17,11 +17,11 @@ import (
 )
 
 var (
-	MODE                string
-	CONTEXT_SERVER_ADDR string
-	MAC            string
-	IP		    string
-	STATION		    string
+	MODE    string
+	MAC     string
+	IP      string
+	STATION string
+	CS_PORT int = 1339
 )
 
 const (
@@ -39,7 +39,7 @@ func init() {
 		logging.Fatal(err)
 	}
 
-	var cfpath string //for viper
+	var cfpath string     //for viper
 	var cfpathfull string //for copying config file if not existing
 	if runtime.GOOS != "linux" {
 		cfpath = "."
@@ -87,10 +87,9 @@ func init() {
 
 		configureNetworkInterfaces()
 	} else {
-		CONTEXT_SERVER_ADDR = "localhost:1339"
 		MAC = "00:00:00:00:00:00"
-	       IP = "127.0.0.1"
-        }
+		IP = "127.0.0.1"
+	}
 }
 
 //SSID returns ssid from the config

@@ -7,6 +7,7 @@ import (
 	"log"
 	mrand "math/rand"
 	"net/rpc"
+	"strconv"
 	"time"
 
 	"github.com/henrikkorsgaard/here.local/configuration"
@@ -65,7 +66,7 @@ func Run() {
 	}
 
 	config.Rand = rand.Reader
-	service := configuration.CONTEXT_SERVER_ADDR
+	service := configuration.IP + ":" + strconv.Itoa(configuration.CS_PORT)
 	listener, err := tls.Listen("tcp", service, &config)
 	if err != nil {
 		log.Fatalf("server: listen: %s", err)

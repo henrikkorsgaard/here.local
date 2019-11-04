@@ -1,18 +1,19 @@
 package main
 
 import (
-	"fmt"
-	"github.com/henrikkorsgaard/here.local/configuration"
+	"github.com/henrikkorsgaard/here.local/proximity"
+	"github.com/henrikkorsgaard/here.local/server/context"
 )
 
 func main() {
 	//TODO:
 	//Decide on configs
-	fmt.Println(configuration.MODE)	
+
+	go context.Run() //now we have the rpc server running?
+	go proximity.Run()
+
 	for {
 	}
-	//go context.Run() //now we have the rpc server running?
-	//go proximity.Run()
 	//server.Run()
 	// We will fix the config at a later point!
 	//context.Run()

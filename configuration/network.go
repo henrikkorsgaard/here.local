@@ -57,7 +57,6 @@ func configureNetworkInterfaces() {
 
 func detectCompatibleNetworkInterface() (phy *wifi.PHY, err error) {
 
-
 	c, err := wifi.New()
 	defer c.Close()
 	if err != nil {
@@ -100,133 +99,133 @@ func detectCompatibleNetworkInterface() (phy *wifi.PHY, err error) {
 
 func detectScanInterface(wlan *wifi.Interface) (scanIface *wifi.Interface, err error) {
 
-		c, err := wifi.New()
-		defer c.Close()
-		if err != nil {
-			return
-		}
+	c, err := wifi.New()
+	defer c.Close()
+	if err != nil {
+		return
+	}
 
-		var scanNetIface *net.Interface
+	var scanNetIface *net.Interface
 
-		ifaces, err := c.Interfaces()
-		if err != nil {
-			return
-		}
+	ifaces, err := c.Interfaces()
+	if err != nil {
+		return
+	}
 
-		for _, iface := range ifaces {
-			if iface.Name != wlan.Name && iface.Name != "here-monitor" {
-				scanNetIface, err = net.InterfaceByName(iface.Name)
-				if err != nil {
-					return
-				}
-
-				scanIface = iface
-
-				break
-			}
-		}
-
-		if scanNetIface.Flags&net.FlagUp == 0 {
-			_, _, err = runCommand("sudo ifconfig " + scanNetIface.Name + " up")
-			if err != nil || scanNetIface.Flags&net.FlagUp == 0 {
-				scanIface = nil
+	for _, iface := range ifaces {
+		if iface.Name != wlan.Name && iface.Name != "here-monitor" {
+			scanNetIface, err = net.InterfaceByName(iface.Name)
+			if err != nil {
 				return
 			}
 
+			scanIface = iface
+
+			break
 		}
+	}
+
+	if scanNetIface.Flags&net.FlagUp == 0 {
+		_, _, err = runCommand("sudo ifconfig " + scanNetIface.Name + " up")
+		if err != nil || scanNetIface.Flags&net.FlagUp == 0 {
+			scanIface = nil
+			return
+		}
+
+	}
 
 	return
 }
 
 func detectMonitorInterface(phy *wifi.PHY) (monIface *net.Interface, err error) {
 
-		monIface, _ = net.InterfaceByName("here-monitor")
+	monIface, _ = net.InterfaceByName("here-monitor")
 
-		if monIface == nil {
-			_, _, err = runCommand("sudo iw phy " + phy.Name + " interface add here-monitor type monitor")
-			if err != nil {
-				return
-			}
+	if monIface == nil {
+		_, _, err = runCommand("sudo iw phy " + phy.Name + " interface add here-monitor type monitor")
+		if err != nil {
+			return
+		}
 
-			monIface, err = net.InterfaceByName("here-monitor")
-			if err != nil || monIface == nil {
-				return
-			}
+		monIface, err = net.InterfaceByName("here-monitor")
+		if err != nil || monIface == nil {
+			return
+		}
+	}
+
+	if monIface.Flags&net.FlagUp == 0 {
+
+		_, _, err = runCommand("sudo ifconfig here-monitor up")
+		if err != nil {
+			return
 		}
 
 		if monIface.Flags&net.FlagUp == 0 {
-
-			_, _, err = runCommand("sudo ifconfig here-monitor up")
-			if err != nil {
-				return
-			}
-
-			if monIface.Flags&net.FlagUp == 0 {
-				return
-			}
+			return
 		}
+	}
 
 	return
 }
 
 func detectWLANInterface(phy *wifi.PHY) (wlanIface *wifi.Interface, err error) {
 
-		c, err := wifi.New()
-		defer c.Close()
-		if err != nil {
-			return
-		}
+	c, err := wifi.New()
+	defer c.Close()
+	if err != nil {
+		return
+	}
 
-		ifaces, err := c.Interfaces()
-		if err != nil {
-			return
-		}
+	ifaces, err := c.Interfaces()
+	if err != nil {
+		return
+	}
 
-		var wlanNetIface *net.Interface
+	var wlanNetIface *net.Interface
 
-		for _, iface := range ifaces {
-			if iface.PHY == phy.Index && iface.Name != "here-monitor" {
-				wlanIface = iface
-				wlanNetIface, err = net.InterfaceByName(iface.Name)
-				if err != nil {
-					return
-				}
-
-				break
-			}
-		}
-
-		if wlanNetIface == nil {
-			_, _, err = runCommand("sudo iw phy " + phy.Name + " interface add here-wlan type managed")
+	for _, iface := range ifaces {
+		if iface.PHY == phy.Index && iface.Name != "here-monitor" {
+			wlanIface = iface
+			wlanNetIface, err = net.InterfaceByName(iface.Name)
 			if err != nil {
 				return
 			}
 
-			wlanNetIface, err = net.InterfaceByName("here-wlan")
-			if err != nil || wlanNetIface == nil {
-				return
-			}
+			break
+		}
+	}
+
+	if wlanNetIface == nil {
+		_, _, err = runCommand("sudo iw phy " + phy.Name + " interface add here-wlan type managed")
+		if err != nil {
+			return
+		}
+
+		wlanNetIface, err = net.InterfaceByName("here-wlan")
+		if err != nil || wlanNetIface == nil {
+			return
+		}
+	}
+
+	if wlanNetIface.Flags&net.FlagUp == 0 {
+		_, _, err = runCommand("sudo ifconfig " + wlanNetIface.Name + " up")
+		if err != nil {
+			return
 		}
 
 		if wlanNetIface.Flags&net.FlagUp == 0 {
-			_, _, err = runCommand("sudo ifconfig " + wlanNetIface.Name + " up")
-			if err != nil {
-				return
-			}
-
-			if wlanNetIface.Flags&net.FlagUp == 0 {
-				return
-			}
+			return
 		}
+	}
 
 	return
 }
 
 func setupAccessPoint() {
 
-		logging.Info("Setting up Access Point")
-		fmt.Println("Setting up Access Point")
-                /*
+	logging.Info("Setting up Access Point")
+	fmt.Println("Setting up Access Point")
+	/*
 
 		str := "interface=" + wlanInterface.Name + "\n"
 		str += "domain-needed\n"
@@ -330,9 +329,10 @@ func setupWifiConnection() {
 		MODE = SLAVE_MODE
 	} else {
 		MODE = MASTER_MODE
+
 		//TODO: We do not have a nice way of terminating the avahi server aside from rebooting
-		go runCommand("avahi-publish -a -R here.local "+IP) //This need to run in the background
-		_, err = zeroconf.Register("here-local-context-server", "_http._tcp", "local.", 1337, []string{"txtv=0", "lo=1", "la=2"}, nil)
+		go runCommand("avahi-publish -a -R here.local " + IP) //This need to run in the background
+		_, err = zeroconf.Register("here.local.context.server", "_http._tcp", "local.", CS_PORT, []string{"txtv=0", "lo=1", "la=2"}, nil)
 	}
 
 	logging.Info("WLAN configured and connected to " + ssid + " with ip " + ip + " in " + MODE + " mode.")
@@ -340,22 +340,22 @@ func setupWifiConnection() {
 }
 
 func detectIP(wlanIface *wifi.Interface) (ip string, err error) {
-		wlan, err := net.InterfaceByName(wlanIface.Name)
-		if err != nil {
-			return ip, err
-		}
-		addrs, err := wlan.Addrs()
-		if err != nil {
-			return "", err
-		}
-		for _, addr := range addrs {
-			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-				if ipnet.IP.To4() != nil {
-					ip = ipnet.IP.String()
-					break
-				}
+	wlan, err := net.InterfaceByName(wlanIface.Name)
+	if err != nil {
+		return ip, err
+	}
+	addrs, err := wlan.Addrs()
+	if err != nil {
+		return "", err
+	}
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				ip = ipnet.IP.String()
+				break
 			}
 		}
+	}
 	return ip, err
 }
 
@@ -441,7 +441,7 @@ func detectLinkAddress(wlan *wifi.Interface) (addr *net.HardwareAddr, err error)
 }
 
 func isNetworkAvailable(ssid string, iface *wifi.Interface) bool {
-	stdout, _ , _ := runCommand("sudo iw " + iface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
+	stdout, _, _ := runCommand("sudo iw " + iface.Name + " scan | grep SSID | grep -oE '[^ ]+$'")
 	ok := strings.Contains(stdout, ssid)
 	return ok
 }
