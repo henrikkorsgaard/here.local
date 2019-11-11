@@ -38,6 +38,8 @@ type nmapDevice struct {
 type Context struct {
 }
 
+type ContextServer struct{}
+
 type Device struct {
 	Hash        string
 	IP          string
@@ -49,6 +51,9 @@ type Device struct {
 
 // Possible solution https://gist.github.com/ncw/9253562
 func Run() {
+
+	//how to get tls?
+
 	fmt.Println("Running context server")
 	initSqliteDB()
 	salt = randSeq(8)
@@ -211,8 +216,6 @@ func locationEvicted(mac string, i interface{}) {
 	location := i.(models.Location)
 	fmt.Printf("Location evicted %+v\n", location)
 }
-
-//Run starts the context server
 
 func randSeq(n int) string {
 	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ123456789")
