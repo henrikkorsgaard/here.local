@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/grandcat/zeroconf"
 	"github.com/henrikkorsgaard/here.local/configuration"
 	"github.com/henrikkorsgaard/here.local/models"
 
@@ -35,9 +36,6 @@ type nmapDevice struct {
 	Name   string
 }
 
-type Context struct {
-}
-
 type ContextServer struct{}
 
 type Device struct {
@@ -52,20 +50,25 @@ type Device struct {
 // Possible solution https://gist.github.com/ncw/9253562
 func Run() {
 
-	//how to get tls?
-
 	fmt.Println("Running context server")
 	initSqliteDB()
 	salt = randSeq(8)
 
 	locationCache.OnEvicted(locationEvicted)
 
+	StartTLSService()
+	StartContextServerRPC()
+
 	//nmapChannel = make(chan nmapDevice)
 
-	server := new(Context)
-	rpc.Register(server)
+}
 
-	config, err := configuration.GetTLSServerConfig()
+//StartContextServerRPC will start the context server RPC component
+func StartContextServerRPC() {
+	server := new(ContextServer)
+	rpc.Register(server)
+	//need to fix this
+	config, err := serverTLSConfif
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -77,6 +80,10 @@ func Run() {
 		log.Fatalf("server: listen: %s", err)
 	}
 	log.Print("server: listening")
+
+	_, err = zeroconf.Register("here.local.context.server", "_http._tcp", "local.", CS_PORT, []string{"txtv=0", "lo=1", "la=2"}, nil)
+
+	//this will block
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -89,7 +96,8 @@ func Run() {
 	}
 }
 
-func (c *Context) DeviceReading(rd models.Reading, r *Reply) error {
+//DeviceReading gets a reading from proximity nodes (testing and training data)
+func (c *ContextServer) DeviceReading(rd models.Reading, r *Reply) error {
 
 	mac := salt + rd.DeviceMAC
 
@@ -124,7 +132,8 @@ func (c *Context) DeviceReading(rd models.Reading, r *Reply) error {
 	return nil
 }
 
-func (c *Context) DeviceEvent(e models.DeviceEvent, r *Reply) error {
+//DeviceEvent receives events from proximity nodes
+func (c *ContextServer) DeviceEvent(e models.DeviceEvent, r *Reply) error {
 
 	if e.Event == models.DEVICE_JOINED {
 		mac := salt + e.DeviceMAC
@@ -199,17 +208,6 @@ func getDeviceFromCache(MACaddr string) (device models.Device, err error) {
 	}
 
 	return
-}
-
-func (c *Context) ConnectLocation(l models.Location, r *Reply) error {
-	fmt.Println("connecting location")
-	l.Devices = make(map[string]models.Device)
-	err := locationCache.Add(l.MAC, l, cache.DefaultExpiration)
-	if err != nil {
-		fmt.Println("ConnectLocation err")
-		fmt.Println(err)
-	}
-	return nil
 }
 
 func locationEvicted(mac string, i interface{}) {

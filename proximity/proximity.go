@@ -31,6 +31,10 @@ var (
 	rpcServerPort int
 )
 
+type TLSREPLY struct {
+	pemBytes []byte
+}
+
 type Device struct {
 	MAC        string
 	Signal     int
@@ -43,30 +47,52 @@ type Device struct {
 //NOTE: we could do some normalisation here with a kalman filter?
 
 func Run() {
+	/*
+		1. Get TLS client pem bytes
+		2. Connect ContextServerRPC
+		3. Proximity Detect
 
-	deviceCache.OnEvicted(deviceEvicted)
+		TODO Friday:
+			Figure out if we need avahi broadcast of ip/port for both TLSService and ContextServer?
+			Continue through
 
-		fmt.Println("soo far 1")
-	var err error
-	configTLS, err = configuration.GetTLSClientConfig()
+		...
+	*/
+
+	/*
+		deviceCache.OnEvicted(deviceEvicted)
+
+			fmt.Println("soo far 1")
+		var err error
+		configTLS, err = configuration.GetTLSClientConfig()
+		if err != nil {
+			log.Fatalf("configurationGetTLSClientConfig failed: %s", err)
+		}
+		rpcServerIP, rpcServerPort, err = detectContextServerIP()
+		fmt.Println(err)
+		fmt.Println("soo far 2")
+		if err == nil && (rpcServerIP != "" || rpcServerPort != 0) {
+			fmt.Println("soo far 3")
+			connectRPC()
+		}
+
+		mode := configuration.MODE
+		if mode == configuration.DEVELOPER_MODE {
+			//simulate()
+		} else if mode != configuration.CONFIG_MODE {
+			//monitorWifiNetwork()
+		}
+	*/
+}
+
+func getTLSClientConfig() {
+	var reply TLSREPLY
+
+	//holy shit we need the IP!
+	client, err := rpc.DialHTTP("tcp", "localhost:1234")
 	if err != nil {
-		log.Fatalf("configurationGetTLSClientConfig failed: %s", err)
+		log.Fatal("Connection error: ", err)
 	}
-	rpcServerIP, rpcServerPort, err = detectContextServerIP()
-	fmt.Println(err)
-	fmt.Println("soo far 2")
-	if err == nil && (rpcServerIP != "" || rpcServerPort != 0) {
-		fmt.Println("soo far 3")
-		connectRPC()
-	}
-
-	mode := configuration.MODE
-	if mode == configuration.DEVELOPER_MODE {
-		//simulate()
-	} else if mode != configuration.CONFIG_MODE {
-		//monitorWifiNetwork()
-	}
-
 }
 
 func connectRPC() {
@@ -151,7 +177,6 @@ func detectContextServerIP() (ip string, port int, err error) {
 		return
 	}
 
-
 	<-ctx.Done()
 	fmt.Println("from detection ", ip, " ", port)
 	return
@@ -166,12 +191,11 @@ func monitorWifiNetwork() {
 
 	// Set filter
 	/*
-	var filter = "not broadcast" //TODO: ADD DESTINATION/SOURCE TO THE FILTER TO AVOID GETTING TOO MANY PACKETS
-	err = handle.SetBPFFilter(filter)
-	if err != nil {
-		log.Fatal(err)
-	}*/
-
+		var filter = "not broadcast" //TODO: ADD DESTINATION/SOURCE TO THE FILTER TO AVOID GETTING TOO MANY PACKETS
+		err = handle.SetBPFFilter(filter)
+		if err != nil {
+			log.Fatal(err)
+		}*/
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 
@@ -197,7 +221,7 @@ func monitorWifiNetwork() {
 			addr3 := dot11layer.Address3.String()
 			//addr4 := dot11layer.Address4.String()
 			//test := "38:f9:d3:20:3f:e9"
-						
+
 			//fmt.Println(station, addr1, addr2, addr3)
 			//see: https://networkengineering.stackexchange.com/questions/25100/four-layer-2-addresses-in-802-11-frame-header
 			//The ideal case for capturing signal strength between the node and device
@@ -211,12 +235,12 @@ func monitorWifiNetwork() {
 				mac := dot11layer.Address2.String()
 				fmt.Println(mac, " - ", signal)
 				/*
-				if rpcClient != nil {
-					fmt.Println(mac)
-					sendDevice(mac, int(signal))
-				} else {
-					connectRPC()
-				}*/
+					if rpcClient != nil {
+						fmt.Println(mac)
+						sendDevice(mac, int(signal))
+					} else {
+						connectRPC()
+					}*/
 			}
 		}
 	}

@@ -329,10 +329,6 @@ func setupWifiConnection() {
 		MODE = SLAVE_MODE
 	} else {
 		MODE = MASTER_MODE
-
-		//TODO: We do not have a nice way of terminating the avahi server aside from rebooting
-		go runCommand("avahi-publish -a -R here.local " + IP) //This need to run in the background
-		_, err = zeroconf.Register("here.local.context.server", "_http._tcp", "local.", CS_PORT, []string{"txtv=0", "lo=1", "la=2"}, nil)
 	}
 
 	logging.Info("WLAN configured and connected to " + ssid + " with ip " + ip + " in " + MODE + " mode.")
