@@ -1,17 +1,25 @@
 package context
 
 import (
+	"bytes"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
 	"log"
+	"math/big"
 	mrand "math/rand"
+	"net"
 	"net/rpc"
 	"strconv"
 	"time"
 
 	"github.com/grandcat/zeroconf"
 	"github.com/henrikkorsgaard/here.local/configuration"
+	"github.com/henrikkorsgaard/here.local/logging"
 	"github.com/henrikkorsgaard/here.local/models"
 
 	"github.com/patrickmn/go-cache"
@@ -22,6 +30,8 @@ var (
 	deviceCache   = cache.New(cache.NoExpiration, cache.NoExpiration)
 	locationCache = cache.New(10*time.Second, 30*time.Second) // prolly should only rarely expire!
 	salt          string
+	pemBytes      []byte
+	serverTLSConf *tls.Config
 )
 
 type Reply struct {
@@ -68,19 +78,17 @@ func StartContextServerRPC() {
 	server := new(ContextServer)
 	rpc.Register(server)
 	//need to fix this
-	config, err := serverTLSConfif
-	if err != nil {
-		fmt.Println(err)
-	}
+	var err error
+	serverTLSConf, pemBytes, err = generateTLSCertificates()
+	logging.Fatal(err)
 
-	config.Rand = rand.Reader
+	serverTLSConf.Rand = rand.Reader
 	service := configuration.IP + ":" + strconv.Itoa(configuration.CS_PORT)
-	listener, err := tls.Listen("tcp", service, &config)
-	if err != nil {
-		log.Fatalf("server: listen: %s", err)
-	}
-	log.Print("server: listening")
+	listener, err := tls.Listen("tcp", service, serverTLSConf)
+	logging.Fatal(err)
+	logging.Info("server: listening")
 
+	//Is this enough?
 	_, err = zeroconf.Register("here.local.context.server", "_http._tcp", "local.", CS_PORT, []string{"txtv=0", "lo=1", "la=2"}, nil)
 
 	//this will block
@@ -103,10 +111,7 @@ func (c *ContextServer) DeviceReading(rd models.Reading, r *Reply) error {
 
 	//we only do that on insert
 	hash, err := bcrypt.GenerateFromPassword([]byte(mac), 10)
-	if err != nil {
-		fmt.Println("should log, but here is error")
-		fmt.Println(err)
-	}
+	logging.Fatal(err)
 
 	var location models.Location
 
@@ -231,4 +236,104 @@ func nmapScan(mac string, ch chan nmapDevice) {
 	} else {
 		fmt.Println("Run normal nmap scan")
 	}
+}
+
+func generateTLSCertificates() (serverTLSConf *tls.Config, PEMBytes []byte, err error) {
+
+	ca := &x509.Certificate{
+		SerialNumber: big.NewInt(2019),
+		Subject: pkix.Name{
+			Organization:  []string{"Computer Science, Aarhus University"},
+			Country:       []string{"DK"},
+			Province:      []string{""},
+			Locality:      []string{"Aarhus N"},
+			StreetAddress: []string{"Aabogade 34"},
+			PostalCode:    []string{"8200"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(10, 0, 0),
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+	}
+
+	caPrivKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &caPrivKey.PublicKey, caPrivKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	caPEM := new(bytes.Buffer)
+	pem.Encode(caPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: caBytes,
+	})
+
+	caPrivKeyPEM := new(bytes.Buffer)
+	pem.Encode(caPrivKeyPEM, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(caPrivKey),
+	})
+	fmt.Println("HOLD UP -- WE NEED TO GET THE LAN IP FOR CONFIGURATION")
+	log.Fatal("HOLD UP -- WE NEED TO GET THE LAN IP FOR CONFIGURATION")
+	// set up our server certificate
+	cert := &x509.Certificate{
+		SerialNumber: big.NewInt(2019),
+		Subject: pkix.Name{
+			Organization:  []string{"Computer Science, Aarhus University"},
+			Country:       []string{"DK"},
+			Province:      []string{""},
+			Locality:      []string{"Aarhus N"},
+			StreetAddress: []string{"Aabogade 34"},
+			PostalCode:    []string{"8200"},
+		},
+		DNSNames: []string{"localhost", "here.local"},
+		//WE NEED TO ADD THE LAN IP TO THE LIST -- replace "192.168.1.134 with local lan ip.
+		IPAddresses:  []net.IP{net.IPv4(127, 0, 0, 1), net.ParseIP("192.168.1.134"), net.IPv6loopback},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().AddDate(10, 0, 0),
+		SubjectKeyId: []byte{1, 2, 3, 4, 6},
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+	}
+
+	certPrivKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	certBytes, err := x509.CreateCertificate(rand.Reader, cert, ca, &certPrivKey.PublicKey, caPrivKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	certPEM := new(bytes.Buffer)
+	pem.Encode(certPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certBytes,
+	})
+
+	certPrivKeyPEM := new(bytes.Buffer)
+	pem.Encode(certPrivKeyPEM, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(certPrivKey),
+	})
+
+	serverCert, err := tls.X509KeyPair(certPEM.Bytes(), certPrivKeyPEM.Bytes())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	serverTLSConf = &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+	}
+
+	PEMBytes = caPEM.Bytes()
+
+	return
 }
